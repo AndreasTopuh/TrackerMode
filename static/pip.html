@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>TrackerMode — Metrics</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            background: #0a0a0f;
+            color: #e0e0ef;
+            font-family: 'Segoe UI', 'Inter', sans-serif;
+            padding: 12px 14px;
+            overflow: hidden;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        .border {
+            position: fixed;
+            inset: 0;
+            border: 2px solid transparent;
+            border-image: linear-gradient(135deg, #6C5CE7, #00D2FF) 1;
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        .hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .logo {
+            font-size: 9px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 700;
+        }
+
+        .score-box {
+            display: flex;
+            align-items: baseline;
+            gap: 5px
+        }
+
+        .score {
+            font-size: 46px;
+            font-weight: 900;
+            font-family: 'Consolas', 'JetBrains Mono', monospace;
+            line-height: 1;
+            transition: color 0.3s;
+        }
+
+        .score-label {
+            font-size: 9px;
+            color: #444;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 6px
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .lbl {
+            font-size: 8.5px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            width: 40px;
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+
+        .bar {
+            flex: 1;
+            height: 5px;
+            background: #151520;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+            width: 0%;
+        }
+
+        .val {
+            font-size: 8.5px;
+            color: #999;
+            font-family: 'Consolas', monospace;
+            width: 60px;
+            text-align: right;
+            flex-shrink: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid #151520;
+            margin: 6px 0 4px;
+        }
+
+        .blink-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .blink-lbl {
+            font-size: 8.5px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 600
+        }
+
+        .blink-val {
+            font-size: 10px;
+            color: #999;
+            font-family: 'Consolas', monospace
+        }
+
+        .alert {
+            display: none;
+            margin-top: 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 9px;
+            font-weight: 600;
+            text-align: center;
+            animation: flash 0.5s ease;
+        }
+
+        @keyframes flash {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.6
+            }
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #00E676;
+            box-shadow: 0 0 6px #00E67688;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.4
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="border"></div>
+
+    <div class="hdr">
+        <div style="display:flex;align-items:center;gap:6px">
+            <div class="status-dot"></div>
+            <span class="logo">TrackerMode</span>
+        </div>
+        <div class="score-box">
+            <span class="score" id="score">--</span>
+            <span class="score-label">focus</span>
+        </div>
+    </div>
+
+    <div class="metrics">
+        <div class="row"><span class="lbl">Gaze</span>
+            <div class="bar">
+                <div class="fill" id="g-gaze"></div>
+            </div><span class="val" id="v-gaze">--</span>
+        </div>
+        <div class="row"><span class="lbl">Eyes</span>
+            <div class="bar">
+                <div class="fill" id="g-eyes"></div>
+            </div><span class="val" id="v-eyes">--</span>
+        </div>
+        <div class="row"><span class="lbl">Head</span>
+            <div class="bar">
+                <div class="fill" id="g-head"></div>
+            </div><span class="val" id="v-head">--</span>
+        </div>
+        <div class="row"><span class="lbl">Mouse</span>
+            <div class="bar">
+                <div class="fill" id="g-mouse"></div>
+            </div><span class="val" id="v-mouse">--</span>
+        </div>
+        <div class="row"><span class="lbl">Keys</span>
+            <div class="bar">
+                <div class="fill" id="g-keys"></div>
+            </div><span class="val" id="v-keys">--</span>
+        </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="blink-row">
+        <span class="blink-lbl">Blink Rate</span>
+        <span class="blink-val" id="blink-val">--/m</span>
+    </div>
+
+    <div class="alert" id="alert-bar"></div>
+
+    <script>
+        // Listen for data from main window via localStorage
+        function update() {
+            try {
+                const raw = localStorage.getItem('tm_pip_data');
+                if (!raw) return;
+                const d = JSON.parse(raw);
+
+                // Score
+                const scoreEl = document.getElementById('score');
+                scoreEl.textContent = d.score ?? '--';
+                const s = d.score || 0;
+                scoreEl.style.color = s >= 70 ? '#00E676' : s >= 50 ? '#FFB300' : '#FF5252';
+
+                // Gauges
+                setGauge('gaze', d.gaze);
+                setGauge('eyes', d.eyes);
+                setGauge('head', d.head);
+                setGauge('mouse', d.mouse);
+                setGauge('keys', d.keys);
+
+                // Blink
+                document.getElementById('blink-val').textContent = (d.blink || '0') + '/m';
+
+                // Alert
+                const alertEl = document.getElementById('alert-bar');
+                if (d.alert) {
+                    alertEl.style.display = 'block';
+                    alertEl.textContent = d.alert;
+                    const t = d.alertType || 'warning';
+                    alertEl.style.background = t === 'danger' ? '#FF525222' : '#FFB30022';
+                    alertEl.style.color = t === 'danger' ? '#FF5252' : '#FFB300';
+                } else {
+                    alertEl.style.display = 'none';
+                }
+
+                // Status dot color based on score
+                const dot = document.querySelector('.status-dot');
+                dot.style.background = s >= 70 ? '#00E676' : s >= 50 ? '#FFB300' : '#FF5252';
+                dot.style.boxShadow = `0 0 6px ${s >= 70 ? '#00E67688' : s >= 50 ? '#FFB30088' : '#FF525288'}`;
+            } catch (e) { }
+        }
+
+        function setGauge(id, value) {
+            const fill = document.getElementById('g-' + id);
+            const val = document.getElementById('v-' + id);
+            if (!fill || !val) return;
+            val.textContent = value || '--';
+            const pct = valToPct(value);
+            fill.style.width = pct + '%';
+            fill.style.background = pct >= 70 ? '#00E676' : pct >= 40 ? '#FFB300' : '#FF5252';
+        }
+
+        function valToPct(v) {
+            if (!v || v === '--') return 0;
+            if (v === 'center' || v === 'Open' || v === 'forward' || v === 'Active') return 100;
+            if (v === 'left' || v === 'right' || v.includes('looking l') || v.includes('looking r')) return 60;
+            if (v === 'Closed' || v.includes('looking d')) return 15;
+            if (typeof v === 'string' && v.startsWith('Idle')) {
+                const sec = parseInt(v.replace(/\D/g, '')) || 0;
+                return Math.max(0, 100 - sec * 3);
+            }
+            return 50;
+        }
+
+        // Update every 400ms
+        setInterval(update, 400);
+        update();
+    </script>
+</body>
+
+</html>

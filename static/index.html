@@ -1,15 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="TrackerMode v2 — AI-powered focus tracker that monitors your attention and keeps you productive">
+    <meta name="description"
+        content="TrackerMode v2.1 — AI-powered focus tracker with eye tracking, screen monitoring, and AI analysis">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <title>TrackerMode — Focus Tracker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
     <!-- ===== SPLASH / START SCREEN ===== -->
     <div id="splash-screen" class="screen active">
@@ -17,19 +23,19 @@
             <div class="splash-glow"></div>
             <div class="splash-icon">
                 <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                    <circle cx="40" cy="40" r="36" stroke="url(#grad1)" stroke-width="3" fill="none"/>
-                    <circle cx="40" cy="40" r="18" fill="url(#grad1)" opacity="0.2"/>
-                    <circle cx="40" cy="40" r="8" fill="url(#grad1)"/>
+                    <circle cx="40" cy="40" r="36" stroke="url(#grad1)" stroke-width="3" fill="none" />
+                    <circle cx="40" cy="40" r="18" fill="url(#grad1)" opacity="0.2" />
+                    <circle cx="40" cy="40" r="8" fill="url(#grad1)" />
                     <defs>
                         <linearGradient id="grad1" x1="0" y1="0" x2="80" y2="80">
-                            <stop offset="0%" stop-color="#6C5CE7"/>
-                            <stop offset="100%" stop-color="#00D2FF"/>
+                            <stop offset="0%" stop-color="#6C5CE7" />
+                            <stop offset="100%" stop-color="#00D2FF" />
                         </linearGradient>
                     </defs>
                 </svg>
             </div>
             <h1 class="splash-title">Tracker<span class="gradient-text">Mode</span></h1>
-            <p class="splash-subtitle">AI-Powered Focus Tracker</p>
+            <p class="splash-subtitle">AI-Powered Focus Tracker <span class="version-badge">v2.1</span></p>
 
             <div class="setup-card">
                 <div class="setup-field">
@@ -45,7 +51,8 @@
 
                 <div class="setup-field">
                     <label for="focus-task">What are you focusing on?</label>
-                    <input type="text" id="focus-task" placeholder="e.g. Coursera Machine Learning..." autocomplete="off">
+                    <input type="text" id="focus-task" placeholder="e.g. Coursera Machine Learning..."
+                        autocomplete="off">
                 </div>
 
                 <div class="setup-toggles">
@@ -54,6 +61,14 @@
                         <span class="toggle-label">Webcam Eye Tracking</span>
                         <label class="toggle-switch">
                             <input type="checkbox" id="toggle-webcam" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <span class="toggle-icon">🖥️</span>
+                        <span class="toggle-label">Screen Monitor</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-screen" checked>
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
@@ -91,12 +106,12 @@
                 <div class="header-left">
                     <div class="logo-mini">
                         <svg width="28" height="28" viewBox="0 0 80 80" fill="none">
-                            <circle cx="40" cy="40" r="36" stroke="url(#grad2)" stroke-width="4" fill="none"/>
-                            <circle cx="40" cy="40" r="8" fill="url(#grad2)"/>
+                            <circle cx="40" cy="40" r="36" stroke="url(#grad2)" stroke-width="4" fill="none" />
+                            <circle cx="40" cy="40" r="8" fill="url(#grad2)" />
                             <defs>
                                 <linearGradient id="grad2" x1="0" y1="0" x2="80" y2="80">
-                                    <stop offset="0%" stop-color="#6C5CE7"/>
-                                    <stop offset="100%" stop-color="#00D2FF"/>
+                                    <stop offset="0%" stop-color="#6C5CE7" />
+                                    <stop offset="100%" stop-color="#00D2FF" />
                                 </linearGradient>
                             </defs>
                         </svg>
@@ -107,11 +122,23 @@
                     <div class="timer-display" id="timer-display">25:00</div>
                 </div>
                 <div class="header-right">
+                    <button id="btn-pip" class="btn-icon-only btn-pip-launch" title="Open PiP Metrics">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                            <rect x="12" y="10" width="8" height="6" rx="1" fill="currentColor" opacity="0.3" />
+                        </svg>
+                    </button>
                     <button id="btn-pause" class="btn-icon-only" title="Pause">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="4" width="4" height="16" rx="1" />
+                            <rect x="14" y="4" width="4" height="16" rx="1" />
+                        </svg>
                     </button>
                     <button id="btn-stop" class="btn-icon-only btn-danger" title="End Session">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                        </svg>
                     </button>
                 </div>
             </header>
@@ -188,11 +215,69 @@
                 </div>
             </main>
 
-            <!-- Hidden webcam preview -->
+            <!-- Floating Metrics Bar (right side) -->
+            <div class="floating-bar" id="floating-bar">
+                <button class="floating-bar-toggle" id="floating-bar-toggle" title="Toggle Metrics">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 3h4v18H3V3zm7 4h4v14h-4V7zm7 6h4v8h-4v-8z" />
+                    </svg>
+                </button>
+                <div class="floating-bar-content" id="floating-bar-content">
+                    <div class="float-metric">
+                        <span class="float-label">GAZE</span>
+                        <div class="gauge-bar">
+                            <div class="gauge-fill" id="gauge-gaze"></div>
+                        </div>
+                        <span class="float-val" id="float-gaze-val">--</span>
+                    </div>
+                    <div class="float-metric">
+                        <span class="float-label">EYES</span>
+                        <div class="gauge-bar">
+                            <div class="gauge-fill" id="gauge-eyes"></div>
+                        </div>
+                        <span class="float-val" id="float-eyes-val">--</span>
+                    </div>
+                    <div class="float-metric">
+                        <span class="float-label">HEAD</span>
+                        <div class="gauge-bar">
+                            <div class="gauge-fill" id="gauge-head"></div>
+                        </div>
+                        <span class="float-val" id="float-head-val">--</span>
+                    </div>
+                    <div class="float-metric">
+                        <span class="float-label">MOUSE</span>
+                        <div class="gauge-bar">
+                            <div class="gauge-fill" id="gauge-mouse"></div>
+                        </div>
+                        <span class="float-val" id="float-mouse-val">--</span>
+                    </div>
+                    <div class="float-metric">
+                        <span class="float-label">KEYS</span>
+                        <div class="gauge-bar">
+                            <div class="gauge-fill" id="gauge-keys"></div>
+                        </div>
+                        <span class="float-val" id="float-keys-val">--</span>
+                    </div>
+                    <div class="float-metric float-blink">
+                        <span class="float-label">BLINK</span>
+                        <span class="float-val mono" id="float-blink-val">--/m</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Webcam preview -->
             <div class="webcam-preview" id="webcam-preview">
                 <video id="webcam-video" autoplay playsinline muted></video>
                 <canvas id="webcam-canvas" style="display:none;"></canvas>
                 <div class="webcam-label">Webcam</div>
+            </div>
+
+            <!-- Screen capture preview -->
+            <div class="screen-preview" id="screen-preview">
+                <video id="screen-video" autoplay playsinline muted></video>
+                <canvas id="screen-canvas" style="display:none;"></canvas>
+                <img id="screen-thumbnail" class="screen-thumbnail" alt="Screen">
+                <div class="webcam-label">Screen</div>
             </div>
         </div>
     </div>
@@ -208,9 +293,7 @@
             </div>
             <div class="quiz-body">
                 <p class="quiz-question" id="quiz-question">What is 7 × 8?</p>
-                <div class="quiz-options" id="quiz-options">
-                    <!-- Populated dynamically -->
-                </div>
+                <div class="quiz-options" id="quiz-options"></div>
             </div>
             <div class="quiz-footer">
                 <div class="quiz-timer-bar">
@@ -220,8 +303,38 @@
         </div>
     </div>
 
-    <!-- ===== NOTIFICATION TOAST ===== -->
+    <!-- ===== PiP ALERT BAR (persistent notification) ===== -->
     <div id="notification-container" class="notification-container"></div>
+    <div id="pip-alert" class="pip-alert hidden">
+        <div class="pip-alert-icon" id="pip-alert-icon">⚠️</div>
+        <div class="pip-alert-content">
+            <div class="pip-alert-title" id="pip-alert-title">Focus Dropping!</div>
+            <div class="pip-alert-msg" id="pip-alert-msg">Stay focused on your task</div>
+        </div>
+        <div class="pip-alert-score">
+            <span class="pip-alert-score-val" id="pip-alert-score">--</span>
+            <span class="pip-alert-score-label">SCORE</span>
+        </div>
+        <button class="pip-alert-close" id="pip-alert-close">✕</button>
+    </div>
+
+    <!-- ===== ALARM OVERLAY (plays sound until dismissed) ===== -->
+    <div id="alarm-overlay" class="alarm-overlay hidden">
+        <div class="alarm-content">
+            <div class="alarm-pulse-ring"></div>
+            <div class="alarm-icon">🚨</div>
+            <h2 class="alarm-title">Focus Lost!</h2>
+            <p class="alarm-msg" id="alarm-msg">You've been unfocused for too long!</p>
+            <button id="btn-im-back" class="btn-im-back">
+                <span>✋</span> I'm Back — Let's Focus!
+            </button>
+        </div>
+    </div>
+
+    <!-- Alarm sound -->
+    <audio id="alarm-sound" loop preload="auto">
+        <source src="/static/mixkit-urgent-simple-tone-loop-2976.wav" type="audio/wav">
+    </audio>
 
     <!-- ===== SUMMARY SCREEN ===== -->
     <div id="summary-screen" class="screen">
@@ -246,6 +359,23 @@
                     <span class="summary-stat-label">Quizzes</span>
                 </div>
             </div>
+
+            <!-- AI Analysis Section -->
+            <div class="ai-analysis-section" id="ai-analysis-section">
+                <h2 class="ai-analysis-title">🤖 AI Coach Analysis</h2>
+                <div class="ai-analysis-idle" id="ai-idle">
+                    <p>Mau analisis sesi dengan AI? (menggunakan API credit)</p>
+                    <button id="btn-ai-analyze" class="btn-ai-analyze">
+                        <span>🤖</span> Analisis dengan AI
+                    </button>
+                </div>
+                <div class="ai-analysis-loading" id="ai-loading" style="display:none;">
+                    <div class="ai-spinner"></div>
+                    <p>Analyzing your session with AI...</p>
+                </div>
+                <div class="ai-analysis-result" id="ai-result" style="display:none;"></div>
+            </div>
+
             <button id="btn-restart" class="btn-primary btn-glow">
                 <span class="btn-icon">🔄</span>
                 Start New Session
@@ -255,9 +385,12 @@
 
     <script src="/static/tracker.js"></script>
     <script src="/static/webcam.js"></script>
+    <script src="/static/screencapture.js"></script>
     <script src="/static/quiz.js"></script>
     <script src="/static/session.js"></script>
     <script src="/static/dashboard.js"></script>
+    <script src="/static/pip.js"></script>
     <script src="/static/main.js"></script>
 </body>
+
 </html>
