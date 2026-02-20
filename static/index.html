@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="TrackerMode v2 — AI-powered focus tracker that monitors your attention and keeps you productive">
+    <title>TrackerMode — Focus Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- ===== SPLASH / START SCREEN ===== -->
+    <div id="splash-screen" class="screen active">
+        <div class="splash-container">
+            <div class="splash-glow"></div>
+            <div class="splash-icon">
+                <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                    <circle cx="40" cy="40" r="36" stroke="url(#grad1)" stroke-width="3" fill="none"/>
+                    <circle cx="40" cy="40" r="18" fill="url(#grad1)" opacity="0.2"/>
+                    <circle cx="40" cy="40" r="8" fill="url(#grad1)"/>
+                    <defs>
+                        <linearGradient id="grad1" x1="0" y1="0" x2="80" y2="80">
+                            <stop offset="0%" stop-color="#6C5CE7"/>
+                            <stop offset="100%" stop-color="#00D2FF"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <h1 class="splash-title">Tracker<span class="gradient-text">Mode</span></h1>
+            <p class="splash-subtitle">AI-Powered Focus Tracker</p>
+
+            <div class="setup-card">
+                <div class="setup-field">
+                    <label for="focus-duration">Focus Duration</label>
+                    <div class="duration-selector">
+                        <button class="duration-btn" data-minutes="15">15m</button>
+                        <button class="duration-btn active" data-minutes="25">25m</button>
+                        <button class="duration-btn" data-minutes="45">45m</button>
+                        <button class="duration-btn" data-minutes="60">60m</button>
+                        <button class="duration-btn" data-minutes="90">90m</button>
+                    </div>
+                </div>
+
+                <div class="setup-field">
+                    <label for="focus-task">What are you focusing on?</label>
+                    <input type="text" id="focus-task" placeholder="e.g. Coursera Machine Learning..." autocomplete="off">
+                </div>
+
+                <div class="setup-toggles">
+                    <div class="toggle-item">
+                        <span class="toggle-icon">👁️</span>
+                        <span class="toggle-label">Webcam Eye Tracking</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-webcam" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <span class="toggle-icon">🖱️</span>
+                        <span class="toggle-label">Cursor Monitoring</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-cursor" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <span class="toggle-icon">⌨️</span>
+                        <span class="toggle-label">Keyboard Activity</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-keyboard" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <button id="btn-start-focus" class="btn-primary btn-glow">
+                    <span class="btn-icon">🎯</span>
+                    Start Focus Session
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== FOCUS SESSION SCREEN ===== -->
+    <div id="session-screen" class="screen">
+        <div class="session-layout">
+            <!-- Top Bar -->
+            <header class="session-header">
+                <div class="header-left">
+                    <div class="logo-mini">
+                        <svg width="28" height="28" viewBox="0 0 80 80" fill="none">
+                            <circle cx="40" cy="40" r="36" stroke="url(#grad2)" stroke-width="4" fill="none"/>
+                            <circle cx="40" cy="40" r="8" fill="url(#grad2)"/>
+                            <defs>
+                                <linearGradient id="grad2" x1="0" y1="0" x2="80" y2="80">
+                                    <stop offset="0%" stop-color="#6C5CE7"/>
+                                    <stop offset="100%" stop-color="#00D2FF"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <span class="header-task" id="header-task-name">Focusing...</span>
+                </div>
+                <div class="header-center">
+                    <div class="timer-display" id="timer-display">25:00</div>
+                </div>
+                <div class="header-right">
+                    <button id="btn-pause" class="btn-icon-only" title="Pause">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                    </button>
+                    <button id="btn-stop" class="btn-icon-only btn-danger" title="End Session">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="session-main">
+                <!-- Focus Score Ring -->
+                <div class="score-section">
+                    <div class="score-ring-container">
+                        <svg class="score-ring" viewBox="0 0 200 200">
+                            <circle class="score-ring-bg" cx="100" cy="100" r="85" />
+                            <circle class="score-ring-fill" id="score-ring-fill" cx="100" cy="100" r="85" />
+                        </svg>
+                        <div class="score-value">
+                            <span class="score-number" id="score-number">--</span>
+                            <span class="score-label">Focus Score</span>
+                        </div>
+                    </div>
+                    <div class="score-status" id="score-status">Initializing...</div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card" id="stat-webcam">
+                        <div class="stat-icon">👁️</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-webcam-value">--</span>
+                            <span class="stat-label">Eye Contact</span>
+                        </div>
+                        <div class="stat-indicator" id="stat-webcam-indicator"></div>
+                    </div>
+                    <div class="stat-card" id="stat-cursor">
+                        <div class="stat-icon">🖱️</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-cursor-value">Active</span>
+                            <span class="stat-label">Cursor</span>
+                        </div>
+                        <div class="stat-indicator active" id="stat-cursor-indicator"></div>
+                    </div>
+                    <div class="stat-card" id="stat-keyboard">
+                        <div class="stat-icon">⌨️</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-keyboard-value">Active</span>
+                            <span class="stat-label">Keyboard</span>
+                        </div>
+                        <div class="stat-indicator active" id="stat-keyboard-indicator"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-avg-value">--%</span>
+                            <span class="stat-label">Avg Focus</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Timeline -->
+                <div class="timeline-section">
+                    <h3 class="section-title">Focus Timeline</h3>
+                    <div class="timeline-chart" id="timeline-chart">
+                        <canvas id="timeline-canvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Activity Log -->
+                <div class="log-section">
+                    <h3 class="section-title">Activity Log</h3>
+                    <div class="log-list" id="log-list">
+                        <div class="log-item log-info">
+                            <span class="log-time">--:--</span>
+                            <span class="log-msg">Session starting...</span>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Hidden webcam preview -->
+            <div class="webcam-preview" id="webcam-preview">
+                <video id="webcam-video" autoplay playsinline muted></video>
+                <canvas id="webcam-canvas" style="display:none;"></canvas>
+                <div class="webcam-label">Webcam</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== QUIZ OVERLAY ===== -->
+    <div id="quiz-overlay" class="overlay hidden">
+        <div class="quiz-container">
+            <div class="quiz-pulse"></div>
+            <div class="quiz-header">
+                <span class="quiz-icon">⚡</span>
+                <h2>Focus Check!</h2>
+                <p class="quiz-subtitle" id="quiz-roast">Stay focused! Answer this to continue.</p>
+            </div>
+            <div class="quiz-body">
+                <p class="quiz-question" id="quiz-question">What is 7 × 8?</p>
+                <div class="quiz-options" id="quiz-options">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            <div class="quiz-footer">
+                <div class="quiz-timer-bar">
+                    <div class="quiz-timer-fill" id="quiz-timer-fill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== NOTIFICATION TOAST ===== -->
+    <div id="notification-container" class="notification-container"></div>
+
+    <!-- ===== SUMMARY SCREEN ===== -->
+    <div id="summary-screen" class="screen">
+        <div class="summary-container">
+            <div class="summary-icon">🎉</div>
+            <h1>Session Complete!</h1>
+            <div class="summary-stats">
+                <div class="summary-stat">
+                    <span class="summary-stat-value" id="summary-duration">00:00</span>
+                    <span class="summary-stat-label">Duration</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="summary-stat-value" id="summary-focus">--%</span>
+                    <span class="summary-stat-label">Avg Focus</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="summary-stat-value" id="summary-alerts">0</span>
+                    <span class="summary-stat-label">Alerts</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="summary-stat-value" id="summary-quizzes">0</span>
+                    <span class="summary-stat-label">Quizzes</span>
+                </div>
+            </div>
+            <button id="btn-restart" class="btn-primary btn-glow">
+                <span class="btn-icon">🔄</span>
+                Start New Session
+            </button>
+        </div>
+    </div>
+
+    <script src="/static/tracker.js"></script>
+    <script src="/static/webcam.js"></script>
+    <script src="/static/quiz.js"></script>
+    <script src="/static/session.js"></script>
+    <script src="/static/dashboard.js"></script>
+    <script src="/static/main.js"></script>
+</body>
+</html>
