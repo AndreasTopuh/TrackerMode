@@ -1,83 +1,47 @@
-# 🎯 TrackerMode — AI-Powered Focus Tracker
+# 🎯 TrackerMode v2.2
 
-> **Stay focused. Stay productive. No more doomscrolling.**
+> **AI-powered focus tracking** with real-time eye tracking, screen monitoring, and AI session analysis.
 
-TrackerMode is an AI-powered productivity tool that monitors your focus in real-time using face tracking, cursor monitoring, and keyboard activity — then roasts you (and quizzes you) when you start losing focus.
-
----
-
-## 📌 Versions
-
-### `v1.0` — Doomscrolling Blocker (Python Script)
-The original version. A standalone Python script that uses your webcam to detect when you're looking down at your phone (doomscrolling).
-
-**Features:**
-- Real-time face & eye tracking with OpenCV
-- Detects head tilt and eye position to identify doomscrolling
-- Displays brutal roast messages on screen
-- Auto-plays `rickroll.mp4` as punishment 🎵
-- Auto-stops video when you return to good posture
-
-**Run:** `python main.py`
+TrackerMode monitors your focus during study or work sessions using your webcam (MediaPipe FaceLandmarker), keyboard/mouse activity, and screen sharing. When your focus drops, it alerts you with visual warnings and audio alarms.
 
 ---
 
-### `v2.0` — Focus Tracker Web App ✨ *(Current)*
-A full web application upgrade. Runs in your browser with a premium dark-mode UI. Monitors multiple signals to measure your focus and keeps you engaged with quizzes.
+## ✨ Features
 
-**Features:**
-- 👁️ **Webcam Eye Tracking** — OpenCV analyzes face position, eye contact, and head tilt via WebSocket
-- 🖱️ **Cursor Monitoring** — Detects mouse inactivity (idle > 30s triggers warning)
-- ⌨️ **Keyboard Tracking** — Monitors keystroke activity
-- 📊 **Real-time Focus Score** — Combined score (0-100) from all signals
-- ⚡ **Quiz System** — Math, capital cities, and sequence quizzes to snap you back to focus
-- 🔔 **Smart Alerts** — Escalating notifications: warning → roast → quiz
-- 📈 **Focus Timeline** — Live chart showing your focus score over time
-- 🎯 **Pomodoro Timer** — Configurable session duration (15/25/45/60/90 min)
-- 🎉 **Session Summary** — Stats at the end of each session
+### 🧠 Focus Detection
+- **Eye Tracking** — MediaPipe 478-landmark face detection with iris tracking
+- **Gaze Direction** — Detects center/left/right gaze from iris position
+- **Head Pose** — Estimates forward/down/left/right head orientation
+- **Blink Rate** — Real-time blink detection via Eye Aspect Ratio (EAR)
+- **Smart Scoring** — Combined attention score (0–100) from all inputs
 
-**Tech Stack:**
-- **Backend:** Python, FastAPI, OpenCV, WebSocket
-- **Frontend:** Vanilla HTML/CSS/JS with premium dark-mode design
+### 📊 Live Dashboard
+- **Focus Score Ring** — Large circular gauge with color-coded score
+- **Focus Timeline** — Real-time chart showing score over time
+- **Activity Log** — Timestamped events with color-coded status
+- **Floating Metrics Bar** — Compact gauges for gaze, eyes, head, mouse, keyboard
+- **Pop-out Metrics (PiP)** — Separate small window visible across all tabs
 
----
+### 🔔 Alerts & Alarms
+- **Visual Alerts** — PiP-style alert bar for focus warnings
+- **Toast Notifications** — Pop-up messages for events
+- **Audio Alarm** — Loops alarm sound when focus drops severely (3+ consecutive alerts)
+- **"I'm Back" Overlay** — Fullscreen dismiss button to acknowledge and resume
 
-## 🚀 Quick Start
+### 🖥️ Screen Capture
+- **Tab Sharing** — Share your browser tab for monitoring
+- **In-Session Toggle** — Start/stop screen sharing during active session
+- **Preview Thumbnail** — Live screen preview in dashboard corner
 
-### Prerequisites
-- Python 3.10+
-- Webcam (optional, for eye tracking)
+### 🤖 AI Coach (Optional)
+- **Post-Session Analysis** — Click "Analisis dengan AI" to get AI feedback
+- **Powered by GPT-4o-mini** — In Bahasa Indonesia, casual & supportive tone
+- **API Credit Friendly** — Only triggered on button click, not automatic
 
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/AndreasTopuh/TrackerMode.git
-cd TrackerMode
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### Run v1.0 (Doomscrolling Blocker)
-```bash
-python main.py
-```
-- Opens webcam window
-- Look at screen normally → Green "Good posture!" message
-- Look down at phone → Red warning + RICKROLL 🎵
-- Press **`q`** to quit
-
-### Run v2.0 (Focus Tracker Web App)
-```bash
-python server.py
-```
-Then open **http://localhost:8000** in your browser.
-
-1. Configure your session (duration, task name, tracking options)
-2. Click **"Start Focus Session"**
-3. Allow webcam access when prompted
-4. Stay focused! The app will alert you if you drift off
+### 📱 Activity Monitoring
+- **Mouse Tracking** — Detects mouse movement and idle time
+- **Keyboard Tracking** — Monitors keypress activity
+- **Quiz System** — Random focus check quizzes on severe distraction
 
 ---
 
@@ -85,59 +49,103 @@ Then open **http://localhost:8000** in your browser.
 
 ```
 TrackerMode/
-├── main.py              # v1.0 — Doomscrolling blocker script
-├── server.py            # v2.0 — FastAPI backend server
-├── requirements.txt     # Python dependencies
-├── rickroll.mp4         # Rickroll punishment video
-├── idea.md              # Original project idea
-├── README.md            # This file
-└── static/              # v2.0 Frontend files
-    ├── index.html       # Main HTML page
-    ├── style.css        # Premium dark-mode design
-    ├── main.js          # App entry point
-    ├── tracker.js       # Cursor & keyboard tracker
-    ├── webcam.js        # Webcam + WebSocket manager
-    ├── quiz.js          # Quiz system
-    ├── session.js       # Session timer & focus logic
-    └── dashboard.js     # Timeline chart & activity log
+├── server.py              # FastAPI backend + MediaPipe + WebSocket
+├── main.py                # Original standalone tracker (legacy)
+├── requirements.txt       # Python dependencies
+├── .env                   # OpenAI API key
+├── face_landmarker.task   # MediaPipe model (auto-downloaded)
+│
+└── static/
+    ├── index.html          # Main app UI
+    ├── pip.html            # Pop-out metrics window
+    ├── favicon.svg         # App icon
+    │
+    ├── css/
+    │   └── style.css       # All styles (1600+ lines)
+    │
+    ├── js/
+    │   ├── main.js         # App entry point & orchestration
+    │   ├── session.js      # Session timer & focus scoring
+    │   ├── tracker.js      # Mouse/keyboard activity tracker
+    │   ├── webcam.js       # Webcam + WebSocket to MediaPipe
+    │   ├── screencapture.js # Screen sharing via getDisplayMedia
+    │   ├── dashboard.js    # Focus timeline chart & activity log
+    │   ├── quiz.js         # Focus check quiz system
+    │   └── pip.js          # Pop-out metrics window manager
+    │
+    └── audio/
+        └── mixkit-urgent-simple-tone-loop-2976.mp3  # Alarm sound
 ```
 
 ---
 
-## 🛠️ Customization
+## 🚀 Quick Start
 
-### v1.0
-- **Roast messages:** Edit `self.roasts` list in `main.py`
-- **Detection sensitivity:** Adjust `face_position_ratio` thresholds
-- **Video file:** Change `self.rickroll_path`
+### 1. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Set Up Environment
+```bash
+# Create .env file
+echo OPENAI_API_KEY=your-api-key-here > .env
+```
+> AI analysis is optional. The app works without an API key.
+
+### 3. Run
+```bash
+python server.py
+```
+Open **http://localhost:8000** in Chrome.
+
+---
+
+## 🔧 Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Backend | FastAPI + Uvicorn |
+| Face Detection | MediaPipe FaceLandmarker (Tasks API) |
+| Fallback | Haar Cascades (OpenCV) |
+| AI Analysis | OpenAI GPT-4o-mini |
+| Frontend | Vanilla HTML/CSS/JS |
+| Communication | WebSocket (real-time frames) |
+| Screen Capture | getDisplayMedia API |
+| PiP Window | window.open() popup |
+| Audio | HTML5 Audio API |
+
+---
+
+## 📝 Changelog
+
+### v2.2
+- 📁 Reorganized folder structure (`css/`, `js/`, `audio/`)
+- 🔊 Fixed audio alarm (MP3 format, correct paths)
+- 🧠 Fixed metrics logic — gauges properly drop when no face detected
+- 🖥️ Added in-session sharescreen toggle button
+- 📺 Pop-out metrics window (PiP) via popup
+
+### v2.1
+- Added floating metrics bar with gauges
+- MediaPipe FaceLandmarker with VIDEO mode
+- PiP alert bar for focus warnings
+- AI analysis button (saves API credits)
+- Alarm system with "I'm Back" overlay
 
 ### v2.0
-- **Focus thresholds:** Edit `warningThreshold` and `quizThreshold` in `session.js`
-- **Mouse idle time:** Adjust `mouseIdleThreshold` in `tracker.js` (default: 30s)
-- **Quiz types:** Add new generators in `quiz.js`
-- **Roast messages:** Edit the `roasts` array in `main.js`
+- Full web-based tracker with dashboard
+- Focus timeline chart
+- Quiz system for focus checks
+- Screen capture monitoring
+
+### v1.0
+- Standalone Python tracker (main.py)
+- Basic Haar Cascade face/eye detection
+- Console-based focus scoring
 
 ---
 
-## 📋 Requirements
+## 📜 License
 
-| Package | Version |
-|---------|---------|
-| opencv-python | ~4.12.0 |
-| numpy | ~2.2.6 |
-| fastapi | ≥0.115.0 |
-| uvicorn | ≥0.34.0 |
-| websockets | ≥14.0 |
-| Pillow | ≥11.0 |
-
----
-
-## 👨‍💻 Author
-
-**Andreas Topuh**
-
----
-
-## 📄 License
-
-Free to use. Stay productive! 💪
+AndreasJeno — Built for learning and productivity.

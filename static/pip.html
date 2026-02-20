@@ -294,7 +294,7 @@
         }
 
         function valToPct(v) {
-            if (!v || v === '--') return 0;
+            if (!v || v === '--' || v === 'none') return 0;
             if (v === 'center' || v === 'Open' || v === 'forward' || v === 'Active') return 100;
             if (v === 'left' || v === 'right' || v.includes('looking l') || v.includes('looking r')) return 60;
             if (v === 'Closed' || v.includes('looking d')) return 15;

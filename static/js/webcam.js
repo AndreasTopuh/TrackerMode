@@ -18,6 +18,7 @@ class WebcamManager {
         this.listeners = [];
         this.connected = false;
         this.reconnectTimer = null;
+        this.onError = null; // callback for webcam failures
     }
 
     async start() {
@@ -36,6 +37,15 @@ class WebcamManager {
             // Show webcam preview
             document.getElementById('webcam-preview').classList.add('visible');
 
+            // Detect webcam disconnect mid-session
+            this.stream.getVideoTracks().forEach(track => {
+                track.addEventListener('ended', () => {
+                    console.warn('Webcam track ended');
+                    this.isRunning = false;
+                    if (this.onError) this.onError();
+                });
+            });
+
             this._connectWebSocket();
             this.isRunning = true;
             this._startFrameLoop();
@@ -43,6 +53,7 @@ class WebcamManager {
             return true;
         } catch (err) {
             console.warn('Webcam access denied or unavailable:', err.message);
+            if (this.onError) this.onError();
             return false;
         }
     }

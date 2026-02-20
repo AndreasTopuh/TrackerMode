@@ -1678,3 +1678,71 @@ body {
 .btn-im-back span {
     font-size: 1.3rem;
 }
+
+/* ============================================
+   v2.3 — POMODORO BREAK OVERLAY
+   ============================================ */
+.break-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 8000;
+    background: rgba(10, 10, 15, 0.88);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: alarm-fade-in 0.4s ease;
+}
+
+.break-content {
+    text-align: center;
+    animation: alarm-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.break-icon {
+    font-size: 5rem;
+    margin-bottom: 1rem;
+}
+
+.break-title {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #00E676;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 0 30px rgba(0, 230, 118, 0.3);
+}
+
+.break-msg {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+    max-width: 400px;
+}
+
+.break-timer {
+    font-size: 3rem;
+    font-weight: 900;
+    font-family: var(--font-mono);
+    color: var(--accent-secondary);
+    margin-bottom: 2rem;
+    text-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+}
+
+.btn-skip-break {
+    padding: 0.6rem 1.8rem;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-md);
+    font-family: var(--font-main);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-skip-break:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}

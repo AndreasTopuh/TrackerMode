@@ -1,7 +1,7 @@
 /**
- * TrackerMode v2.1 — Main Entry Point
+ * TrackerMode v2.3 — Main Entry Point
  * Wires together: Session, ActivityTracker, WebcamManager, ScreenCapture, Quiz, Dashboard
- * New in v2.1: Floating metrics bar, screen capture, AI session analysis, mediapipe data
+ * v2.3: Push notifications, smart cooldown, webcam fallback, Pomodoro breaks
  */
 
 (function() {
@@ -60,6 +60,10 @@
     let pipAlertTimer = null;
     let consecutiveLowCount = 0;
     let alarmActive = false;
+    let lastAlertTime = 0;           // Smart cooldown
+    const ALERT_COOLDOWN_MS = 30000; // 30 seconds between alerts
+    let webcamFailed = false;        // Webcam fallback flag
+    let pushPermission = false;      // Browser push notification permission
 
     // --- Duration Selector ---
     document.querySelectorAll('.duration-btn').forEach(btn => {
@@ -121,12 +125,45 @@
         }
     });
 
+    // --- Share Screen Button (in-session) ---
+    document.getElementById('btn-share-screen').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-share-screen');
+        if (screenCap.isCapturing) {
+            screenCap.stop();
+            btn.classList.remove('active');
+            screenEnabled = false;
+            dashboard.addLog('🖥️ Screen sharing stopped', 'info');
+        } else {
+            const ok = await screenCap.start();
+            if (ok) {
+                btn.classList.add('active');
+                screenEnabled = true;
+                dashboard.addLog('🖥️ Screen sharing started', 'success');
+            } else {
+                showNotification('⚠️ Screen Capture', 'Screen sharing denied', 'warning');
+            }
+        }
+    });
+
     function startSession() {
         const taskName = document.getElementById('focus-task').value.trim() || 'Focus Session';
         headerTaskName.textContent = taskName;
 
         tracker.enabled.cursor = cursorEnabled;
         tracker.enabled.keyboard = keyboardEnabled;
+        webcamFailed = false;
+        lastAlertTime = 0;
+        consecutiveLowCount = 0;
+
+        // Request browser push notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission().then(perm => {
+                pushPermission = perm === 'granted';
+                if (pushPermission) dashboard.addLog('🔔 Push notifications enabled', 'info');
+            });
+        } else {
+            pushPermission = Notification.permission === 'granted';
+        }
 
         switchScreen(sessionScreen);
         dashboard.init();
@@ -192,12 +229,25 @@
             // Update PiP window
             pip.update({
                 score: data.smoothed_score || data.attention_score,
-                gaze: data.gaze_direction || '--',
-                eyes: data.eyes_open ? 'Open' : 'Closed',
-                head: (data.head_pose || '--').replace('_', ' '),
+                gaze: data.face_detected ? (data.gaze_direction || '--') : 'none',
+                eyes: data.face_detected ? (data.eyes_open ? 'Open' : 'Closed') : 'none',
+                head: data.face_detected ? (data.head_pose || '--').replace('_', ' ') : 'none',
                 blink: String(data.blink_rate || 0)
             });
         });
+
+        // Webcam error/disconnect fallback
+        webcam.onError = () => {
+            if (!webcamFailed) {
+                webcamFailed = true;
+                webcamEnabled = false;
+                dashboard.addLog('⚠️ Webcam lost — switched to keyboard/mouse-only mode', 'warning');
+                showNotification('📷 Webcam Disconnected', 'Scoring now uses keyboard/mouse only', 'warning');
+                sendPushNotification('TrackerMode', 'Webcam disconnected — fallback mode active');
+                document.getElementById('stat-webcam-value').textContent = 'Offline';
+                updateIndicator('stat-webcam-indicator', 'danger');
+            }
+        };
 
         // Screen capture events
         screenCap.onCapture((data) => {
@@ -253,19 +303,36 @@
             dashboard.addDataPoint(currentScore, session.elapsed);
         };
 
-        // Alert — show PiP bar + check for alarm
+        // Alert — show PiP bar + check for alarm + SMART COOLDOWN
         session.onAlert = (score) => {
+            const now = Date.now();
+            // Smart cooldown: skip if less than 30s since last alert
+            if (now - lastAlertTime < ALERT_COOLDOWN_MS) {
+                consecutiveLowCount++; // still count for alarm trigger
+                return;
+            }
+            lastAlertTime = now;
+
             const roast = roasts[Math.floor(Math.random() * roasts.length)];
-            showPipAlert('⚠️ Focus Dropping!', roast, score, 'warning');
-            showNotification('⚠️ Focus Dropping!', roast, 'warning');
-            pip.showAlert('⚠️ Focus Drop!', roast, 'warning');
-            dashboard.addLog(`⚠️ Focus alert — score: ${score}%`, 'warning');
+
+            // Escalating severity
+            let severity = 'warning';
+            if (consecutiveLowCount >= 4) severity = 'danger';
+
+            showPipAlert('⚠️ Focus Dropping!', roast, score, severity);
+            showNotification('⚠️ Focus Dropping!', roast, severity);
+            pip.showAlert('⚠️ Focus Drop!', roast, severity);
+            dashboard.addLog(`⚠️ Focus alert — score: ${score}%`, severity);
+
+            // Browser push notification
+            sendPushNotification('⚠️ Focus Dropping!', roast);
 
             consecutiveLowCount++;
             // Trigger alarm after 3 consecutive alerts
             if (consecutiveLowCount >= 3 && !alarmActive) {
                 triggerAlarm(roast);
                 dashboard.addLog('🚨 ALARM — user seems away!', 'danger');
+                sendPushNotification('🚨 ALARM', 'You\'ve been unfocused for too long! Come back!');
             }
         };
 
@@ -335,6 +402,10 @@
         document.getElementById('ai-result').style.display = 'none';
 
         switchScreen(summaryScreen);
+
+        // Pomodoro break reminder
+        sendPushNotification('🎉 Session Complete!', `Average focus: ${summary.avgFocus}%. Take a 5-minute break!`);
+        showBreakReminder();
     }
 
     async function triggerAIAnalysis() {
@@ -381,20 +452,29 @@
     // --- Floating Bar Update ---
     function updateFloatingBar(webcamData, activityStatus) {
         if (webcamData) {
-            // Gaze gauge
-            const gazeScore = webcamData.gaze_direction === 'center' ? 100 : webcamData.gaze_direction === 'unknown' ? 0 : 50;
+            const faceOk = webcamData.face_detected;
+
+            // Gaze gauge — drop to 0 when no face or 'none'
+            const gazeDir = webcamData.gaze_direction;
+            const gazeScore = !faceOk || gazeDir === 'none' ? 0
+                : gazeDir === 'center' ? 100
+                : 50;
             setGauge('gauge-gaze', gazeScore);
-            document.getElementById('float-gaze-val').textContent = webcamData.gaze_direction || '--';
+            document.getElementById('float-gaze-val').textContent = faceOk ? (gazeDir || '--') : 'none';
 
-            // Eyes gauge
-            const eyesScore = webcamData.eyes_open ? 100 : 10;
+            // Eyes gauge — drop to 0 when no face
+            const eyesScore = !faceOk ? 0 : (webcamData.eyes_open ? 100 : 10);
             setGauge('gauge-eyes', eyesScore);
-            document.getElementById('float-eyes-val').textContent = webcamData.eyes_open ? 'Open' : 'Closed';
+            document.getElementById('float-eyes-val').textContent = faceOk ? (webcamData.eyes_open ? 'Open' : 'Closed') : 'none';
 
-            // Head gauge
-            const headScore = webcamData.head_pose === 'forward' ? 100 : webcamData.head_pose === 'looking_down' ? 20 : 60;
+            // Head gauge — drop to 0 when no face or 'none'
+            const headPose = webcamData.head_pose;
+            const headScore = !faceOk || headPose === 'none' ? 0
+                : headPose === 'forward' ? 100
+                : headPose === 'looking_down' ? 20
+                : 60;
             setGauge('gauge-head', headScore);
-            document.getElementById('float-head-val').textContent = (webcamData.head_pose || '--').replace('_', ' ');
+            document.getElementById('float-head-val').textContent = faceOk ? (headPose || '--').replace('_', ' ') : 'none';
 
             // Blink rate
             document.getElementById('float-blink-val').textContent = `${webcamData.blink_rate || 0}/m`;
@@ -523,6 +603,56 @@
         alarmOverlay.classList.add('hidden');
         alarmSound.pause();
         alarmSound.currentTime = 0;
+    }
+
+    // --- BROWSER PUSH NOTIFICATIONS ---
+    function sendPushNotification(title, body) {
+        if (!pushPermission || !('Notification' in window) || Notification.permission !== 'granted') return;
+        try {
+            new Notification(title, {
+                body: body,
+                icon: '/static/favicon.svg',
+                silent: false,
+                tag: 'trackermode-alert'
+            });
+        } catch(e) {
+            console.warn('Push notification failed:', e);
+        }
+    }
+
+    // --- POMODORO BREAK REMINDER ---
+    function showBreakReminder() {
+        const overlay = document.createElement('div');
+        overlay.className = 'break-overlay';
+        overlay.innerHTML = `
+            <div class="break-content">
+                <div class="break-icon">☕</div>
+                <h2 class="break-title">Take a Break!</h2>
+                <p class="break-msg">You've earned it. Stand up, stretch, and rest your eyes for 5 minutes.</p>
+                <div class="break-timer" id="break-countdown">5:00</div>
+                <button class="btn-skip-break" id="btn-skip-break">Skip Break</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        let breakSeconds = 300; // 5 minutes
+        const countdownEl = overlay.querySelector('#break-countdown');
+        const breakInterval = setInterval(() => {
+            breakSeconds--;
+            const m = Math.floor(breakSeconds / 60);
+            const s = breakSeconds % 60;
+            countdownEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+            if (breakSeconds <= 0) {
+                clearInterval(breakInterval);
+                overlay.remove();
+                sendPushNotification('⏰ Break Over!', 'Ready for the next focus session?');
+            }
+        }, 1000);
+
+        overlay.querySelector('#btn-skip-break').addEventListener('click', () => {
+            clearInterval(breakInterval);
+            overlay.remove();
+        });
     }
 
 })();

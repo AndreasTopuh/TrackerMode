@@ -13,7 +13,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 
 <body>
@@ -122,6 +122,14 @@
                     <div class="timer-display" id="timer-display">25:00</div>
                 </div>
                 <div class="header-right">
+                    <button id="btn-share-screen" class="btn-icon-only btn-pip-launch" title="Share Screen">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                            <line x1="8" y1="21" x2="16" y2="21" />
+                            <line x1="12" y1="17" x2="12" y2="21" />
+                        </svg>
+                    </button>
                     <button id="btn-pip" class="btn-icon-only btn-pip-launch" title="Open PiP Metrics">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
@@ -333,7 +341,7 @@
 
     <!-- Alarm sound -->
     <audio id="alarm-sound" loop preload="auto">
-        <source src="/static/mixkit-urgent-simple-tone-loop-2976.wav" type="audio/wav">
+        <source src="/static/audio/notifications1.mp3" type="audio/mpeg">
     </audio>
 
     <!-- ===== SUMMARY SCREEN ===== -->
@@ -383,14 +391,14 @@
         </div>
     </div>
 
-    <script src="/static/tracker.js"></script>
-    <script src="/static/webcam.js"></script>
-    <script src="/static/screencapture.js"></script>
-    <script src="/static/quiz.js"></script>
-    <script src="/static/session.js"></script>
-    <script src="/static/dashboard.js"></script>
-    <script src="/static/pip.js"></script>
-    <script src="/static/main.js"></script>
+    <script src="/static/js/tracker.js"></script>
+    <script src="/static/js/webcam.js"></script>
+    <script src="/static/js/screencapture.js"></script>
+    <script src="/static/js/quiz.js"></script>
+    <script src="/static/js/session.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/pip.js"></script>
+    <script src="/static/js/main.js"></script>
 </body>
 
 </html>
