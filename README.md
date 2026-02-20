@@ -1,4 +1,4 @@
-# 🎯 TrackerMode v2.2
+# 🎯 TrackerMode v2.3
 
 > **AI-powered focus tracking** with real-time eye tracking, screen monitoring, and AI session analysis.
 
@@ -118,6 +118,16 @@ Open **http://localhost:8000** in Chrome.
 ---
 
 ## 📝 Changelog
+
+### v2.3
+- ⏰ **Pomodoro System** — automatic cycles with break duration mapped to session length
+  - 15min→3min, 25min→5min, 45min→10min, 60min→15min, 90min→30min breaks
+  - 4 cycles → long break → session complete
+  - Violation breaks: after 2+ alarm dismissals, suggests mid-session break
+  - Cycle indicator badge in session header
+- 🔔 Browser push notifications (visible even when minimized)
+- ⏱️ Smart alert cooldown (30s between alerts, escalating severity)
+- 📷 Webcam fallback — auto keyboard/mouse-only mode if webcam disconnects
 
 ### v2.2
 - 📁 Reorganized folder structure (`css/`, `js/`, `audio/`)

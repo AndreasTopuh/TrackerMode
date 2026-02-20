@@ -120,6 +120,7 @@
                 </div>
                 <div class="header-center">
                     <div class="timer-display" id="timer-display">25:00</div>
+                    <div class="cycle-badge" id="cycle-badge">Cycle 1/4</div>
                 </div>
                 <div class="header-right">
                     <button id="btn-share-screen" class="btn-icon-only btn-pip-launch" title="Share Screen">
@@ -343,6 +344,19 @@
     <audio id="alarm-sound" loop preload="auto">
         <source src="/static/audio/notifications1.mp3" type="audio/mpeg">
     </audio>
+
+    <!-- ===== VIOLATION BREAK SUGGESTION ===== -->
+    <div id="break-suggest" class="break-suggest hidden">
+        <div class="break-suggest-content">
+            <div class="break-suggest-icon">😤</div>
+            <h3>Sepertinya kamu butuh istirahat</h3>
+            <p class="break-suggest-msg">Kamu sudah kehilangan fokus beberapa kali. Mau break 5 menit dulu?</p>
+            <div class="break-suggest-actions">
+                <button id="btn-accept-break" class="btn-accept-break">☕ Ya, istirahat dulu</button>
+                <button id="btn-skip-break-suggest" class="btn-skip-suggest">⚡ Lanjut aja</button>
+            </div>
+        </div>
+    </div>
 
     <!-- ===== SUMMARY SCREEN ===== -->
     <div id="summary-screen" class="screen">

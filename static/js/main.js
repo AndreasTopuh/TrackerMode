@@ -96,6 +96,19 @@
         showNotification('✅ Welcome back!', 'Let\'s get focused again!', 'success');
         dashboard.addLog('✅ User returned — alarm dismissed', 'success');
         consecutiveLowCount = 0;
+        session.registerAlarmDismiss(); // track for violation breaks
+    });
+
+    // --- Violation Break Suggestion buttons ---
+    document.getElementById('btn-accept-break').addEventListener('click', () => {
+        document.getElementById('break-suggest').classList.add('hidden');
+        dashboard.addLog('☕ User accepted violation break', 'info');
+        showBreakReminder(5 * 60, 'violation'); // 5-min violation break
+    });
+    document.getElementById('btn-skip-break-suggest').addEventListener('click', () => {
+        document.getElementById('break-suggest').classList.add('hidden');
+        session.resume();
+        dashboard.addLog('⚡ User skipped break suggestion', 'info');
     });
 
     // --- Buttons ---
@@ -172,6 +185,9 @@
 
         // Start session timer
         session.start(selectedDuration, taskName);
+
+        // Update cycle badge
+        document.getElementById('cycle-badge').textContent = `Cycle ${session.currentCycle}/${session.maxCycles}`;
 
         // Start activity tracker
         tracker.start();
@@ -356,9 +372,24 @@
             }
         };
 
-        // Session end
+        // Session end (after all cycles or manual stop)
         session.onSessionEnd = (summary) => {
             showSummary(summary);
+        };
+
+        // Pomodoro: cycle complete → break time
+        session.onCycleEnd = (cycleNum, breakSecs) => {
+            dashboard.addLog(`⏰ Cycle ${cycleNum} complete! Break time.`, 'success');
+            sendPushNotification('⏰ Cycle Complete!', `Cycle ${cycleNum} done. Take a ${Math.floor(breakSecs/60)}-minute break!`);
+            showBreakReminder(breakSecs, 'cycle');
+        };
+
+        // Pomodoro: violation break suggestion (after 2+ alarm dismissals)
+        session.onViolationBreak = () => {
+            session.pause();
+            document.getElementById('break-suggest').classList.remove('hidden');
+            dashboard.addLog('😤 Break suggestion shown', 'warning');
+            sendPushNotification('Break?', 'Kamu sudah kehilangan fokus beberapa kali. Break dulu?');
         };
     }
 
@@ -403,9 +434,8 @@
 
         switchScreen(summaryScreen);
 
-        // Pomodoro break reminder
-        sendPushNotification('🎉 Session Complete!', `Average focus: ${summary.avgFocus}%. Take a 5-minute break!`);
-        showBreakReminder();
+        // Push notification for session complete
+        sendPushNotification('🎉 Session Complete!', `${summary.cyclesCompleted} cycles done. Average focus: ${summary.avgFocus}%.`);
     }
 
     async function triggerAIAnalysis() {
@@ -621,21 +651,30 @@
     }
 
     // --- POMODORO BREAK REMINDER ---
-    function showBreakReminder() {
+    function showBreakReminder(breakDurationSecs, breakType) {
         const overlay = document.createElement('div');
         overlay.className = 'break-overlay';
+
+        const breakMins = Math.floor(breakDurationSecs / 60);
+        const isLongBreak = breakType === 'final';
+        const icon = breakType === 'violation' ? '😤' : '☕';
+        const title = breakType === 'violation' ? 'Quick Break!' : (isLongBreak ? 'Long Break — You\'ve earned it!' :'Pomodoro Break!');
+        const msg = breakType === 'violation'
+            ? 'Refresh your mind. Stand up and stretch.'
+            : `Cycle ${session.currentCycle}/${session.maxCycles} complete. Rest for ${breakMins} minutes.`;
+
         overlay.innerHTML = `
             <div class="break-content">
-                <div class="break-icon">☕</div>
-                <h2 class="break-title">Take a Break!</h2>
-                <p class="break-msg">You've earned it. Stand up, stretch, and rest your eyes for 5 minutes.</p>
-                <div class="break-timer" id="break-countdown">5:00</div>
+                <div class="break-icon">${icon}</div>
+                <h2 class="break-title">${title}</h2>
+                <p class="break-msg">${msg}</p>
+                <div class="break-timer" id="break-countdown">${breakMins}:00</div>
                 <button class="btn-skip-break" id="btn-skip-break">Skip Break</button>
             </div>
         `;
         document.body.appendChild(overlay);
 
-        let breakSeconds = 300; // 5 minutes
+        let breakSeconds = breakDurationSecs;
         const countdownEl = overlay.querySelector('#break-countdown');
         const breakInterval = setInterval(() => {
             breakSeconds--;
@@ -645,14 +684,32 @@
             if (breakSeconds <= 0) {
                 clearInterval(breakInterval);
                 overlay.remove();
-                sendPushNotification('⏰ Break Over!', 'Ready for the next focus session?');
+                onBreakComplete(breakType);
             }
         }, 1000);
 
         overlay.querySelector('#btn-skip-break').addEventListener('click', () => {
             clearInterval(breakInterval);
             overlay.remove();
+            onBreakComplete(breakType);
         });
+    }
+
+    function onBreakComplete(breakType) {
+        sendPushNotification('⏰ Break Over!', 'Ready for the next focus session?');
+
+        if (breakType === 'violation') {
+            // Resume remaining time
+            session.resumeFromBreak();
+            dashboard.addLog('▶️ Session resumed after break', 'success');
+            showNotification('⚡ Let\'s go!', 'Session resumed. Stay focused!', 'success');
+        } else if (breakType === 'cycle') {
+            // Start next cycle
+            session.startNextCycle();
+            document.getElementById('cycle-badge').textContent = `Cycle ${session.currentCycle}/${session.maxCycles}`;
+            dashboard.addLog(`▶️ Cycle ${session.currentCycle} started`, 'success');
+            showNotification('🌟 New Cycle!', `Cycle ${session.currentCycle} — Let\'s focus!`, 'success');
+        }
     }
 
 })();
