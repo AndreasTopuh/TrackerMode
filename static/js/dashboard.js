@@ -9,7 +9,7 @@ class Dashboard {
         this.ctx = null;
         this.logList = document.getElementById('log-list');
         this.dataPoints = [];
-        this.maxPoints = 120; // ~6 minutes of data at 3-sec intervals
+        this.maxPoints = 600; // ~30 minutes of data at 3-sec intervals
     }
 
     init() {

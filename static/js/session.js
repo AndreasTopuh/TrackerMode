@@ -168,12 +168,27 @@ class SessionManager {
     updateFocusScore(webcamScore, activityScore) {
         let combined;
         if (webcamScore !== null && webcamScore !== undefined) {
-            combined = Math.round(webcamScore * 0.5 + activityScore * 0.5);
+            if (webcamScore >= 80) {
+                // High webcam confidence — user is clearly focused (e.g. reading)
+                // Webcam dominates, activity is bonus only
+                combined = Math.round(webcamScore * 0.85 + activityScore * 0.15);
+            } else if (webcamScore >= 50) {
+                // Moderate webcam — face detected, mixed signals
+                combined = Math.round(webcamScore * 0.65 + activityScore * 0.35);
+            } else {
+                // Low webcam (no face or looking away) — activity matters more
+                combined = Math.round(webcamScore * 0.35 + activityScore * 0.65);
+            }
         } else {
+            // No webcam — activity only
             combined = activityScore;
         }
         this.currentFocusScore = combined;
         this.focusScores.push({ score: combined, time: this.elapsed });
+        // Limit memory: keep last 2000 entries (~100 min at 3s intervals)
+        if (this.focusScores.length > 2000) {
+            this.focusScores.shift();
+        }
     }
 
     getTimeRemaining() {
@@ -184,7 +199,7 @@ class SessionManager {
     }
 
     getAverageFocus() {
-        if (this.focusScores.length === 0) return 0;
+        if (this.focusScores.length === 0) return null;
         const sum = this.focusScores.reduce((a, b) => a + b.score, 0);
         return Math.round(sum / this.focusScores.length);
     }

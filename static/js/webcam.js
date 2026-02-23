@@ -18,6 +18,8 @@ class WebcamManager {
         this.listeners = [];
         this.connected = false;
         this.reconnectTimer = null;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
         this.onError = null; // callback for webcam failures
     }
 
@@ -82,10 +84,15 @@ class WebcamManager {
         }
 
         document.getElementById('webcam-preview').classList.remove('visible');
+        this.clearListeners();
     }
 
     onAttentionData(callback) {
         this.listeners.push(callback);
+    }
+
+    clearListeners() {
+        this.listeners = [];
     }
 
     getLatestResult() {
@@ -102,6 +109,7 @@ class WebcamManager {
             this.ws.onopen = () => {
                 console.log('WebSocket connected');
                 this.connected = true;
+                this.reconnectAttempts = 0; // reset on success
             };
 
             this.ws.onmessage = (event) => {
@@ -116,7 +124,15 @@ class WebcamManager {
                 console.log('WebSocket disconnected');
                 this.connected = false;
                 if (this.isRunning) {
-                    this.reconnectTimer = setTimeout(() => this._connectWebSocket(), 3000);
+                    this.reconnectAttempts++;
+                    if (this.reconnectAttempts <= this.maxReconnectAttempts) {
+                        console.log(`WebSocket reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+                        this.reconnectTimer = setTimeout(() => this._connectWebSocket(), 3000);
+                    } else {
+                        console.warn('WebSocket max reconnect attempts reached');
+                        this.isRunning = false;
+                        if (this.onError) this.onError();
+                    }
                 }
             };
 

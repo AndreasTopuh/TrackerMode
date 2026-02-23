@@ -7,3 +7,5 @@ Pillow>=11.0.0
 mediapipe>=0.10.0
 openai>=1.0.0
 python-dotenv>=1.0.0
+pynput>=1.7.0
+pygetwindow>=0.0.9

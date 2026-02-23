@@ -5,15 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="TrackerMode v2.1 — AI-powered focus tracker with eye tracking, screen monitoring, and AI analysis">
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+        content="TrackerMode v2.2 — AI-powered focus tracker with eye tracking, screen monitoring, and AI analysis">
+    <link rel="icon" type="image/png" href="/static/icon/logo.svg">
     <title>TrackerMode — Focus Tracker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.2">
 </head>
 
 <body>
@@ -22,20 +22,11 @@
         <div class="splash-container">
             <div class="splash-glow"></div>
             <div class="splash-icon">
-                <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                    <circle cx="40" cy="40" r="36" stroke="url(#grad1)" stroke-width="3" fill="none" />
-                    <circle cx="40" cy="40" r="18" fill="url(#grad1)" opacity="0.2" />
-                    <circle cx="40" cy="40" r="8" fill="url(#grad1)" />
-                    <defs>
-                        <linearGradient id="grad1" x1="0" y1="0" x2="80" y2="80">
-                            <stop offset="0%" stop-color="#6C5CE7" />
-                            <stop offset="100%" stop-color="#00D2FF" />
-                        </linearGradient>
-                    </defs>
-                </svg>
+                <img src="/static/icon/logo.svg" alt="TrackerMode" width="80" height="60"
+                    style="object-fit: contain; filter: drop-shadow(0 0 20px rgba(108, 92, 231, 0.4));">
             </div>
             <h1 class="splash-title">Tracker<span class="gradient-text">Mode</span></h1>
-            <p class="splash-subtitle">AI-Powered Focus Tracker <span class="version-badge">v2.1</span></p>
+            <p class="splash-subtitle">AI-Powered Focus Tracker <span class="version-badge">v2.2</span></p>
 
             <div class="setup-card">
                 <div class="setup-field">
@@ -57,7 +48,7 @@
 
                 <div class="setup-toggles">
                     <div class="toggle-item">
-                        <span class="toggle-icon">👁️</span>
+                        <img src="/static/icon/eye.svg" class="toggle-icon" alt="Eye">
                         <span class="toggle-label">Webcam Eye Tracking</span>
                         <label class="toggle-switch">
                             <input type="checkbox" id="toggle-webcam" checked>
@@ -65,15 +56,13 @@
                         </label>
                     </div>
                     <div class="toggle-item">
-                        <span class="toggle-icon">🖥️</span>
-                        <span class="toggle-label">Screen Monitor</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-screen" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
+                        <img src="/static/icon/screen.svg" class="toggle-icon" alt="Screen">
+                        <span class="toggle-label">Custom Distractions</span>
+                        <input type="text" id="custom-distractions" class="input-distractions"
+                            placeholder="e.g. youtube, reddit" title="Comma-separated app names to block">
                     </div>
                     <div class="toggle-item">
-                        <span class="toggle-icon">🖱️</span>
+                        <img src="/static/icon/mouse.svg" class="toggle-icon" alt="Mouse">
                         <span class="toggle-label">Cursor Monitoring</span>
                         <label class="toggle-switch">
                             <input type="checkbox" id="toggle-cursor" checked>
@@ -81,7 +70,7 @@
                         </label>
                     </div>
                     <div class="toggle-item">
-                        <span class="toggle-icon">⌨️</span>
+                        <img src="/static/icon/keyboard.svg" class="toggle-icon" alt="Keyboard">
                         <span class="toggle-label">Keyboard Activity</span>
                         <label class="toggle-switch">
                             <input type="checkbox" id="toggle-keyboard" checked>
@@ -105,32 +94,28 @@
             <header class="session-header">
                 <div class="header-left">
                     <div class="logo-mini">
-                        <svg width="28" height="28" viewBox="0 0 80 80" fill="none">
-                            <circle cx="40" cy="40" r="36" stroke="url(#grad2)" stroke-width="4" fill="none" />
-                            <circle cx="40" cy="40" r="8" fill="url(#grad2)" />
-                            <defs>
-                                <linearGradient id="grad2" x1="0" y1="0" x2="80" y2="80">
-                                    <stop offset="0%" stop-color="#6C5CE7" />
-                                    <stop offset="100%" stop-color="#00D2FF" />
-                                </linearGradient>
-                            </defs>
-                        </svg>
+                        <img src="/static/icon/logo.svg" alt="TrackerMode" width="28" height="20"
+                            style="object-fit: contain;">
                     </div>
-                    <span class="header-task" id="header-task-name">Focusing...</span>
+                    <span class="header-task" id="header-task-name">Focus Session</span>
                 </div>
                 <div class="header-center">
-                    <div class="timer-display" id="timer-display">25:00</div>
-                    <div class="cycle-badge" id="cycle-badge">Cycle 1/4</div>
+                    <div class="timer-card">
+                        <div class="timer-display" id="timer-display">25:00</div>
+                        <div class="cycle-badge" id="cycle-badge">CYCLE 1/4</div>
+                    </div>
+                    <div class="header-status-row">
+                        <div class="focus-status-badge" id="score-status">
+                            <span class="status-dot"></span>
+                            Initializing...
+                        </div>
+                        <div class="header-score">
+                            <span class="header-score-number" id="score-number">100</span>
+                            <span class="header-score-label">SCORE</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="header-right">
-                    <button id="btn-share-screen" class="btn-icon-only btn-pip-launch" title="Share Screen">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <rect x="2" y="3" width="20" height="14" rx="2" />
-                            <line x1="8" y1="21" x2="16" y2="21" />
-                            <line x1="12" y1="17" x2="12" y2="21" />
-                        </svg>
-                    </button>
                     <button id="btn-pip" class="btn-icon-only btn-pip-launch" title="Open PiP Metrics">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
@@ -152,141 +137,166 @@
                 </div>
             </header>
 
-            <!-- Main Content -->
-            <main class="session-main">
-                <!-- Focus Score Ring -->
-                <div class="score-section">
-                    <div class="score-ring-container">
-                        <svg class="score-ring" viewBox="0 0 200 200">
-                            <circle class="score-ring-bg" cx="100" cy="100" r="85" />
-                            <circle class="score-ring-fill" id="score-ring-fill" cx="100" cy="100" r="85" />
-                        </svg>
-                        <div class="score-value">
-                            <span class="score-number" id="score-number">--</span>
-                            <span class="score-label">Focus Score</span>
-                        </div>
-                    </div>
-                    <div class="score-status" id="score-status">Initializing...</div>
-                </div>
-
-                <!-- Stats Grid -->
-                <div class="stats-grid">
-                    <div class="stat-card" id="stat-webcam">
-                        <div class="stat-icon">👁️</div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="stat-webcam-value">--</span>
-                            <span class="stat-label">Eye Contact</span>
-                        </div>
-                        <div class="stat-indicator" id="stat-webcam-indicator"></div>
-                    </div>
-                    <div class="stat-card" id="stat-cursor">
-                        <div class="stat-icon">🖱️</div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="stat-cursor-value">Active</span>
-                            <span class="stat-label">Cursor</span>
-                        </div>
-                        <div class="stat-indicator active" id="stat-cursor-indicator"></div>
-                    </div>
-                    <div class="stat-card" id="stat-keyboard">
-                        <div class="stat-icon">⌨️</div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="stat-keyboard-value">Active</span>
-                            <span class="stat-label">Keyboard</span>
-                        </div>
-                        <div class="stat-indicator active" id="stat-keyboard-indicator"></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">📊</div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="stat-avg-value">--%</span>
-                            <span class="stat-label">Avg Focus</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Activity Timeline -->
-                <div class="timeline-section">
-                    <h3 class="section-title">Focus Timeline</h3>
-                    <div class="timeline-chart" id="timeline-chart">
-                        <canvas id="timeline-canvas"></canvas>
-                    </div>
-                </div>
-
-                <!-- Activity Log -->
-                <div class="log-section">
-                    <h3 class="section-title">Activity Log</h3>
+            <!-- Dashboard Body: 3-column -->
+            <div class="dashboard-body">
+                <!-- LEFT: Activity Log Sidebar -->
+                <aside class="log-sidebar">
+                    <h3 class="sidebar-title">ACTIVITY LOG</h3>
                     <div class="log-list" id="log-list">
                         <div class="log-item log-info">
                             <span class="log-time">--:--</span>
                             <span class="log-msg">Session starting...</span>
                         </div>
                     </div>
-                </div>
-            </main>
+                </aside>
 
-            <!-- Floating Metrics Bar (right side) -->
-            <div class="floating-bar" id="floating-bar">
-                <button class="floating-bar-toggle" id="floating-bar-toggle" title="Toggle Metrics">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M3 3h4v18H3V3zm7 4h4v14h-4V7zm7 6h4v8h-4v-8z" />
-                    </svg>
-                </button>
-                <div class="floating-bar-content" id="floating-bar-content">
-                    <div class="float-metric">
-                        <span class="float-label">GAZE</span>
-                        <div class="gauge-bar">
-                            <div class="gauge-fill" id="gauge-gaze"></div>
+                <!-- CENTER: Main Content -->
+                <main class="center-content">
+                    <!-- Stats Grid -->
+                    <div class="stats-grid">
+                        <div class="stat-card" id="stat-webcam">
+                            <div class="stat-icon-wrap">
+                                <img src="/static/icon/eye.svg" class="stat-icon-img" alt="Eye">
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-webcam-value">--</span>
+                                <span class="stat-label">EYE CONTACT</span>
+                            </div>
+                            <div class="stat-indicator" id="stat-webcam-indicator"></div>
                         </div>
-                        <span class="float-val" id="float-gaze-val">--</span>
-                    </div>
-                    <div class="float-metric">
-                        <span class="float-label">EYES</span>
-                        <div class="gauge-bar">
-                            <div class="gauge-fill" id="gauge-eyes"></div>
+                        <div class="stat-card" id="stat-cursor">
+                            <div class="stat-icon-wrap">
+                                <img src="/static/icon/mouse.svg" class="stat-icon-img" alt="Cursor">
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-cursor-value">Active</span>
+                                <span class="stat-label">CURSOR</span>
+                            </div>
+                            <div class="stat-indicator active" id="stat-cursor-indicator"></div>
                         </div>
-                        <span class="float-val" id="float-eyes-val">--</span>
-                    </div>
-                    <div class="float-metric">
-                        <span class="float-label">HEAD</span>
-                        <div class="gauge-bar">
-                            <div class="gauge-fill" id="gauge-head"></div>
+                        <div class="stat-card" id="stat-keyboard">
+                            <div class="stat-icon-wrap">
+                                <img src="/static/icon/keyboard.svg" class="stat-icon-img" alt="Keyboard">
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-keyboard-value">Active</span>
+                                <span class="stat-label">KEYBOARD</span>
+                            </div>
+                            <div class="stat-indicator active" id="stat-keyboard-indicator"></div>
                         </div>
-                        <span class="float-val" id="float-head-val">--</span>
-                    </div>
-                    <div class="float-metric">
-                        <span class="float-label">MOUSE</span>
-                        <div class="gauge-bar">
-                            <div class="gauge-fill" id="gauge-mouse"></div>
+                        <div class="stat-card">
+                            <div class="stat-icon-wrap">
+                                <img src="/static/icon/bar_avg.svg" class="stat-icon-img" alt="Average">
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-avg-value">--%</span>
+                                <span class="stat-label">AVG FOCUS</span>
+                            </div>
                         </div>
-                        <span class="float-val" id="float-mouse-val">--</span>
                     </div>
-                    <div class="float-metric">
-                        <span class="float-label">KEYS</span>
-                        <div class="gauge-bar">
-                            <div class="gauge-fill" id="gauge-keys"></div>
+
+                    <!-- Webcam + Screen Feeds -->
+                    <div class="feeds-row">
+                        <div class="feed-panel webcam-feed" id="webcam-preview">
+                            <video id="webcam-video" autoplay playsinline muted></video>
+                            <canvas id="webcam-canvas" style="display:none;"></canvas>
+                            <div class="feed-label">WEBCAM</div>
                         </div>
-                        <span class="float-val" id="float-keys-val">--</span>
+                        <div class="feed-panel app-monitor" id="app-monitor">
+                            <div class="app-monitor-bg" id="app-monitor-bg"></div>
+                            <div class="app-monitor-inner">
+                                <div class="app-monitor-icon" id="app-monitor-icon">🖥️</div>
+                                <div class="app-monitor-name" id="active-app-name">Waiting...</div>
+                                <div class="app-monitor-title" id="active-window-title">No window detected</div>
+                            </div>
+                            <div class="app-monitor-status" id="active-app-status">Initializing</div>
+                            <div class="feed-label" style="z-index: 5;">ACTIVE APP</div>
+                        </div>
                     </div>
-                    <div class="float-metric float-blink">
-                        <span class="float-label">BLINK</span>
-                        <span class="float-val mono" id="float-blink-val">--/m</span>
+
+                    <!-- Focus Timeline -->
+                    <div class="timeline-section">
+                        <h3 class="section-title">FOCUS TIMELINE</h3>
+                        <div class="timeline-chart" id="timeline-chart">
+                            <canvas id="timeline-canvas"></canvas>
+                        </div>
                     </div>
-                </div>
+
+                    <!-- Session Rules -->
+                    <div class="session-rules">
+                        <div class="rules-row">
+                            <div class="rule-item">
+                                <img src="/static/icon/eye.svg" class="rule-icon" alt="Eye">
+                                <span class="rule-text">Keep eyes on screen — look away and score drops</span>
+                            </div>
+                            <div class="rule-item">
+                                <img src="/static/icon/mouse.svg" class="rule-icon" alt="Mouse">
+                                <span class="rule-text">Move cursor regularly — idle mouse lowers focus</span>
+                            </div>
+                            <div class="rule-item">
+                                <img src="/static/icon/keyboard.svg" class="rule-icon" alt="Keyboard">
+                                <span class="rule-text">Stay active on keyboard — typing keeps score high</span>
+                            </div>
+                            <div class="rule-item">
+                                <img src="/static/icon/bar_avg.svg" class="rule-icon" alt="Target">
+                                <span class="rule-text">Maintain 70%+ focus to complete this cycle</span>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- RIGHT: Metrics Sidebar -->
+                <aside class="metrics-sidebar" id="floating-bar">
+                    <div class="metrics-sidebar-content" id="floating-bar-content">
+                        <div class="float-metric">
+                            <span class="float-label">GAZE</span>
+                            <div class="gauge-bar">
+                                <div class="gauge-fill" id="gauge-gaze"></div>
+                            </div>
+                            <span class="float-val" id="float-gaze-val">--</span>
+                        </div>
+                        <div class="float-metric">
+                            <span class="float-label">EYES</span>
+                            <div class="gauge-bar">
+                                <div class="gauge-fill" id="gauge-eyes"></div>
+                            </div>
+                            <span class="float-val" id="float-eyes-val">--</span>
+                        </div>
+                        <div class="float-metric">
+                            <span class="float-label">HEAD</span>
+                            <div class="gauge-bar">
+                                <div class="gauge-fill" id="gauge-head"></div>
+                            </div>
+                            <span class="float-val" id="float-head-val">--</span>
+                        </div>
+                        <div class="float-metric">
+                            <span class="float-label">MOUSE</span>
+                            <div class="gauge-bar">
+                                <div class="gauge-fill" id="gauge-mouse"></div>
+                            </div>
+                            <span class="float-val" id="float-mouse-val">--</span>
+                        </div>
+                        <div class="float-metric">
+                            <span class="float-label">KEYS</span>
+                            <div class="gauge-bar">
+                                <div class="gauge-fill" id="gauge-keys"></div>
+                            </div>
+                            <span class="float-val" id="float-keys-val">--</span>
+                        </div>
+                        <div class="float-metric float-blink">
+                            <span class="float-label">BLINK</span>
+                            <span class="float-val mono" id="float-blink-val">--/m</span>
+                        </div>
+                    </div>
+                </aside>
             </div>
 
-            <!-- Webcam preview -->
-            <div class="webcam-preview" id="webcam-preview">
-                <video id="webcam-video" autoplay playsinline muted></video>
-                <canvas id="webcam-canvas" style="display:none;"></canvas>
-                <div class="webcam-label">Webcam</div>
-            </div>
-
-            <!-- Screen capture preview -->
-            <div class="screen-preview" id="screen-preview">
-                <video id="screen-video" autoplay playsinline muted></video>
-                <canvas id="screen-canvas" style="display:none;"></canvas>
-                <img id="screen-thumbnail" class="screen-thumbnail" alt="Screen">
-                <div class="webcam-label">Screen</div>
+            <!-- Hidden score elements for JS compatibility -->
+            <div style="display:none;">
+                <span id="score-number-hidden">--</span>
+                <svg class="score-ring" viewBox="0 0 200 200">
+                    <circle class="score-ring-fill" id="score-ring-fill" cx="100" cy="100" r="85" />
+                </svg>
             </div>
         </div>
     </div>
@@ -315,7 +325,8 @@
     <!-- ===== PiP ALERT BAR (persistent notification) ===== -->
     <div id="notification-container" class="notification-container"></div>
     <div id="pip-alert" class="pip-alert hidden">
-        <div class="pip-alert-icon" id="pip-alert-icon">⚠️</div>
+        <div class="pip-alert-icon" id="pip-alert-icon"><img src="/static/icon/warning.svg" class="pip-icon-img"
+                alt="Warning"></div>
         <div class="pip-alert-content">
             <div class="pip-alert-title" id="pip-alert-title">Focus Dropping!</div>
             <div class="pip-alert-msg" id="pip-alert-msg">Stay focused on your task</div>
@@ -349,11 +360,38 @@
     <div id="break-suggest" class="break-suggest hidden">
         <div class="break-suggest-content">
             <div class="break-suggest-icon">😤</div>
-            <h3>Sepertinya kamu butuh istirahat</h3>
-            <p class="break-suggest-msg">Kamu sudah kehilangan fokus beberapa kali. Mau break 5 menit dulu?</p>
+            <h3>Looks like you need a break</h3>
+            <p class="break-suggest-msg">You've lost focus multiple times. Want to take a 5-minute break?</p>
             <div class="break-suggest-actions">
-                <button id="btn-accept-break" class="btn-accept-break">☕ Ya, istirahat dulu</button>
-                <button id="btn-skip-break-suggest" class="btn-skip-suggest">⚡ Lanjut aja</button>
+                <button id="btn-accept-break" class="btn-accept-break">☕ Yes, take a break</button>
+                <button id="btn-skip-break-suggest" class="btn-skip-suggest">⚡ Keep going</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== WATCHING VIDEO PROMPT ===== -->
+    <div id="video-prompt" class="video-prompt hidden">
+        <div class="video-prompt-content">
+            <div class="video-prompt-icon">📺</div>
+            <h3>Watching a Video?</h3>
+            <p class="video-prompt-msg">No keyboard/mouse activity detected, but you are looking at the screen. Are you
+                watching a video?</p>
+            <div class="video-prompt-actions">
+                <button id="btn-video-yes" class="btn-video-yes">Yes, I am watching</button>
+                <button id="btn-video-no" class="btn-video-no">No, I should be working</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== DISTRACTION PROMPT ===== -->
+    <div id="distraction-prompt" class="video-prompt hidden">
+        <div class="video-prompt-content">
+            <div class="video-prompt-icon">💬</div>
+            <h3 id="distraction-app-name">App Detected</h3>
+            <p class="video-prompt-msg">This app is in your distraction list. Is it related to your study/work?</p>
+            <div class="video-prompt-actions">
+                <button id="btn-distraction-yes" class="btn-video-yes">Yes, it's for studying</button>
+                <button id="btn-distraction-no" class="btn-video-no">No, I'm distracted</button>
             </div>
         </div>
     </div>
@@ -384,11 +422,11 @@
 
             <!-- AI Analysis Section -->
             <div class="ai-analysis-section" id="ai-analysis-section">
-                <h2 class="ai-analysis-title">🤖 AI Coach Analysis</h2>
+                <h2 class="ai-analysis-title">AI Coach Analysis</h2>
                 <div class="ai-analysis-idle" id="ai-idle">
-                    <p>Mau analisis sesi dengan AI? (menggunakan API credit)</p>
+                    <p>Want to analyze this session with AI? (uses API credits)</p>
                     <button id="btn-ai-analyze" class="btn-ai-analyze">
-                        <span>🤖</span> Analisis dengan AI
+                        Analyze with AI
                     </button>
                 </div>
                 <div class="ai-analysis-loading" id="ai-loading" style="display:none;">
@@ -405,14 +443,13 @@
         </div>
     </div>
 
-    <script src="/static/js/tracker.js"></script>
-    <script src="/static/js/webcam.js"></script>
-    <script src="/static/js/screencapture.js"></script>
-    <script src="/static/js/quiz.js"></script>
-    <script src="/static/js/session.js"></script>
-    <script src="/static/js/dashboard.js"></script>
-    <script src="/static/js/pip.js"></script>
-    <script src="/static/js/main.js"></script>
+    <script src="/static/js/tracker.js?v=2.4"></script>
+    <script src="/static/js/webcam.js?v=2.4"></script>
+    <script src="/static/js/quiz.js?v=2.4"></script>
+    <script src="/static/js/session.js?v=2.4"></script>
+    <script src="/static/js/dashboard.js?v=2.4"></script>
+    <script src="/static/js/pip.js?v=2.4"></script>
+    <script src="/static/js/main.js?v=2.4"></script>
 </body>
 
 </html>

@@ -1,15 +1,31 @@
 /**
- * TrackerMode v2.3 — Main Entry Point
- * Wires together: Session, ActivityTracker, WebcamManager, ScreenCapture, Quiz, Dashboard
- * v2.3: Push notifications, smart cooldown, webcam fallback, Pomodoro breaks
+ * TrackerMode v2.4 — Main Entry Point
+ * Wires together: Session, ActivityTracker, WebcamManager, Quiz, Dashboard
+ * v2.4: Replaced screen capture with active window monitoring + distraction detection
  */
 
 (function() {
+    // --- Icon Paths ---
+    const ICONS = {
+        eye: '/static/icon/eye.svg',
+        mouse: '/static/icon/mouse.svg',
+        keyboard: '/static/icon/keyboard.svg',
+        screen: '/static/icon/screen.svg',
+        warning: '/static/icon/warning.svg',
+        alert: '/static/icon/alert.svg',
+        check: '/static/icon/check.svg',
+        pause: '/static/icon/pause.svg',
+        play: '/static/icon/play.svg',
+        avg: '/static/icon/bar_avg.svg'
+    };
+    function icon(name, size = 16) {
+        return `<img src="${ICONS[name]}" alt="${name}" style="width:${size}px;height:${size}px;vertical-align:middle;margin-right:4px">`;
+    }
+
     // --- Module Instances ---
     const session = new SessionManager();
     const tracker = new ActivityTracker();
     const webcam = new WebcamManager();
-    const screenCap = new ScreenCapture();
     const quiz = new QuizSystem();
     const dashboard = new Dashboard();
     const pip = new PipMetrics();
@@ -17,7 +33,6 @@
     // --- State ---
     let selectedDuration = 25;
     let webcamEnabled = true;
-    let screenEnabled = true;
     let cursorEnabled = true;
     let keyboardEnabled = true;
     let latestWebcamData = null;
@@ -56,14 +71,35 @@
     const alarmOverlay = document.getElementById('alarm-overlay');
     const alarmSound = document.getElementById('alarm-sound');
     const btnImBack = document.getElementById('btn-im-back');
+    const videoPrompt = document.getElementById('video-prompt');
+    const btnVideoYes = document.getElementById('btn-video-yes');
+    const btnVideoNo = document.getElementById('btn-video-no');
+
+    let isWatchingVideo = false;
     let lastSummary = null;
     let pipAlertTimer = null;
+    // LOGIC-3: consecutiveLowCount tracks VISUAL alert escalation (notification → alarm)
+    // session.lowFocusStreak tracks SCORING escalation (alert → quiz trigger)
+    // They serve different purposes and reset independently.
     let consecutiveLowCount = 0;
     let alarmActive = false;
     let lastAlertTime = 0;           // Smart cooldown
     const ALERT_COOLDOWN_MS = 30000; // 30 seconds between alerts
     let webcamFailed = false;        // Webcam fallback flag
     let pushPermission = false;      // Browser push notification permission
+
+    // --- Drowsiness Tolerance ---
+    let drowsinessEpisodes = 0;       // How many times user was caught drowsy
+    let lastDrowsinessTime = 0;       // Cooldown for drowsy notifications
+    const DROWSY_COOLDOWN_MS = 60000; // 60s between drowsy warnings
+    const DROWSY_TOLERANCE = 3;       // Allow 3 episodes before first warning
+
+    // --- Active App Monitor ---
+    const distractionPrompt = document.getElementById('distraction-prompt');
+    const btnDistractionYes = document.getElementById('btn-distraction-yes');
+    const btnDistractionNo = document.getElementById('btn-distraction-no');
+    let whitelistedApps = new Set();     // Apps user confirmed "for studying" this session
+    let lastDistractionApp = '';         // Track which app triggered the prompt
 
     // --- Duration Selector ---
     document.querySelectorAll('.duration-btn').forEach(btn => {
@@ -76,14 +112,15 @@
 
     // --- Toggle Listeners ---
     document.getElementById('toggle-webcam').addEventListener('change', (e) => { webcamEnabled = e.target.checked; });
-    document.getElementById('toggle-screen').addEventListener('change', (e) => { screenEnabled = e.target.checked; });
     document.getElementById('toggle-cursor').addEventListener('change', (e) => { cursorEnabled = e.target.checked; });
     document.getElementById('toggle-keyboard').addEventListener('change', (e) => { keyboardEnabled = e.target.checked; });
 
     // --- Floating Bar Toggle ---
-    floatingBarToggle.addEventListener('click', () => {
-        floatingBar.classList.toggle('collapsed');
-    });
+    if (floatingBarToggle) {
+        floatingBarToggle.addEventListener('click', () => {
+            floatingBar.classList.toggle('collapsed');
+        });
+    }
 
     // --- PiP Alert Close ---
     pipAlertClose.addEventListener('click', () => {
@@ -91,10 +128,15 @@
     });
 
     // --- "I'm Back" Button — dismiss alarm ---
+    // UX-3: "I'm Back" also resumes session if it was auto-paused
     btnImBack.addEventListener('click', () => {
         dismissAlarm();
-        showNotification('✅ Welcome back!', 'Let\'s get focused again!', 'success');
-        dashboard.addLog('✅ User returned — alarm dismissed', 'success');
+        if (session.isPaused) {
+            session.resume();
+            tracker.paused = false;
+        }
+        showNotification('Welcome back!', 'Let\'s get focused again!', 'success');
+        dashboard.addLog(icon('check') + ' User returned — alarm dismissed', 'success');
         consecutiveLowCount = 0;
         session.registerAlarmDismiss(); // track for violation breaks
     });
@@ -102,13 +144,42 @@
     // --- Violation Break Suggestion buttons ---
     document.getElementById('btn-accept-break').addEventListener('click', () => {
         document.getElementById('break-suggest').classList.add('hidden');
-        dashboard.addLog('☕ User accepted violation break', 'info');
+        dashboard.addLog(icon('pause') + ' User accepted violation break', 'info');
         showBreakReminder(5 * 60, 'violation'); // 5-min violation break
     });
     document.getElementById('btn-skip-break-suggest').addEventListener('click', () => {
         document.getElementById('break-suggest').classList.add('hidden');
         session.resume();
-        dashboard.addLog('⚡ User skipped break suggestion', 'info');
+        dashboard.addLog(icon('play') + ' User skipped break suggestion', 'info');
+    });
+
+    // --- Video Prompt Buttons ---
+    btnVideoYes.addEventListener('click', () => {
+        isWatchingVideo = true;
+        videoPrompt.classList.add('hidden');
+        showNotification('Video Mode', 'Activity tracking paused while you watch.', 'info');
+        dashboard.addLog(icon('check') + ' User confirmed watching video', 'success');
+        // Resume recovering focus points instantly based on just webcam
+    });
+    btnVideoNo.addEventListener('click', () => {
+        isWatchingVideo = false;
+        videoPrompt.classList.add('hidden');
+        dashboard.addLog(icon('play') + ' User denied video prompt', 'info');
+    });
+
+    // --- Distraction Prompt Buttons ---
+    btnDistractionYes.addEventListener('click', () => {
+        if (lastDistractionApp) {
+            whitelistedApps.add(lastDistractionApp.toLowerCase());
+        }
+        distractionPrompt.classList.add('hidden');
+        showNotification('App Allowed', `${lastDistractionApp} whitelisted for this session.`, 'success');
+        dashboard.addLog(icon('check') + ` ${lastDistractionApp} whitelisted (study)`, 'success');
+    });
+    btnDistractionNo.addEventListener('click', () => {
+        distractionPrompt.classList.add('hidden');
+        showNotification('Get Back to Work!', `${lastDistractionApp} is a distraction. Focus!`, 'warning');
+        dashboard.addLog(icon('warning') + ` ${lastDistractionApp} confirmed as distraction`, 'warning');
     });
 
     // --- Buttons ---
@@ -126,53 +197,55 @@
         if (pip.isActive) {
             pip.stop();
             btnPip.classList.remove('active');
-            dashboard.addLog('📺 PiP window closed', 'info');
+            dashboard.addLog(icon('screen') + ' PiP window closed', 'info');
         } else {
             const ok = await pip.start();
             if (ok) {
                 btnPip.classList.add('active');
-                dashboard.addLog('📺 PiP metrics window opened!', 'success');
+                dashboard.addLog(icon('screen') + ' PiP metrics window opened!', 'success');
             } else {
-                showNotification('⚠️ PiP', 'PiP not supported in this browser', 'warning');
+                showNotification('PiP Unavailable', 'PiP not supported in this browser', 'warning');
             }
         }
     });
 
-    // --- Share Screen Button (in-session) ---
-    document.getElementById('btn-share-screen').addEventListener('click', async () => {
-        const btn = document.getElementById('btn-share-screen');
-        if (screenCap.isCapturing) {
-            screenCap.stop();
-            btn.classList.remove('active');
-            screenEnabled = false;
-            dashboard.addLog('🖥️ Screen sharing stopped', 'info');
-        } else {
-            const ok = await screenCap.start();
-            if (ok) {
-                btn.classList.add('active');
-                screenEnabled = true;
-                dashboard.addLog('🖥️ Screen sharing started', 'success');
-            } else {
-                showNotification('⚠️ Screen Capture', 'Screen sharing denied', 'warning');
-            }
-        }
-    });
+    // --- Share Screen Button REMOVED in v2.4 (replaced by active window monitor) ---
 
-    function startSession() {
+    async function startSession() {
         const taskName = document.getElementById('focus-task').value.trim() || 'Focus Session';
         headerTaskName.textContent = taskName;
 
         tracker.enabled.cursor = cursorEnabled;
         tracker.enabled.keyboard = keyboardEnabled;
         webcamFailed = false;
+        isWatchingVideo = false;
+        videoPrompt.classList.add('hidden');
+        distractionPrompt.classList.add('hidden');
+        whitelistedApps = new Set();
+        lastDistractionApp = '';
         lastAlertTime = 0;
         consecutiveLowCount = 0;
+        drowsinessEpisodes = 0;
+        lastDrowsinessTime = 0;
+
+        // Send custom distractions to backend
+        const customInput = document.getElementById('custom-distractions').value.trim();
+        if (customInput) {
+            const keywords = customInput.split(',').map(k => k.trim()).filter(Boolean);
+            fetch('/api/distractions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keywords })
+            }).then(() => {
+                dashboard.addLog(icon('check') + ` Custom distractions set: ${keywords.join(', ')}`, 'info');
+            }).catch(() => {});
+        }
 
         // Request browser push notification permission
         if ('Notification' in window && Notification.permission === 'default') {
             Notification.requestPermission().then(perm => {
                 pushPermission = perm === 'granted';
-                if (pushPermission) dashboard.addLog('🔔 Push notifications enabled', 'info');
+                if (pushPermission) dashboard.addLog(icon('check') + ' Push notifications enabled', 'info');
             });
         } else {
             pushPermission = Notification.permission === 'granted';
@@ -181,7 +254,7 @@
         switchScreen(sessionScreen);
         dashboard.init();
         dashboard.clearLog();
-        dashboard.addLog('Session started — Stay focused! 🎯', 'success');
+        dashboard.addLog(icon('avg') + ' Session started — Stay focused!', 'success');
 
         // Start session timer
         session.start(selectedDuration, taskName);
@@ -190,16 +263,21 @@
         document.getElementById('cycle-badge').textContent = `Cycle ${session.currentCycle}/${session.maxCycles}`;
 
         // Start activity tracker
-        tracker.start();
+        await tracker.start();
+        if (tracker.useGlobal) {
+            dashboard.addLog(icon('check') + ' Global input tracking active (pynput)', 'success');
+        } else {
+            dashboard.addLog(icon('warning') + ' Browser-only input tracking (limited)', 'warning');
+        }
 
         // Start webcam
         if (webcamEnabled) {
             webcam.start().then(success => {
                 if (success) {
-                    dashboard.addLog('👁️ Webcam activated — tracking eye contact', 'info');
+                    dashboard.addLog(icon('eye') + ' Webcam activated — tracking eye contact', 'info');
                     updateIndicator('stat-webcam-indicator', 'active');
                 } else {
-                    dashboard.addLog('⚠️ Webcam unavailable — using cursor/keyboard only', 'warning');
+                    dashboard.addLog(icon('warning') + ' Webcam unavailable — using cursor/keyboard only', 'warning');
                     webcamEnabled = false;
                 }
             });
@@ -207,31 +285,57 @@
             document.getElementById('stat-webcam-value').textContent = 'Off';
         }
 
-        // Start screen capture
-        if (screenEnabled) {
-            screenCap.start().then(success => {
-                if (success) {
-                    dashboard.addLog('🖥️ Screen capture activated', 'info');
-                } else {
-                    dashboard.addLog('⚠️ Screen capture denied', 'warning');
-                    screenEnabled = false;
-                }
-            });
-        }
+        // Active window monitoring is handled via tracker.onActivityChange below
+        dashboard.addLog(icon('screen') + ' Active App Monitor enabled', 'info');
 
         // --- Wire Callbacks ---
 
         // Timer tick
+        // UX-4: Update tab title with timer
         session.onTick = (timeStr) => {
             timerDisplay.textContent = timeStr;
+            document.title = `${timeStr} — TrackerMode`;
         };
 
         // Webcam attention data (v2.1: includes gaze, head_pose, blink_rate, ear)
+        // LOGIC-2: Guard against stale frames after webcam disconnect
         webcam.onAttentionData((data) => {
-            if (!session.isRunning || session.isPaused) return;
+            if (!session.isRunning || session.isPaused || webcamFailed) return;
             latestWebcamData = data;
 
-            const activityScore = tracker.getActivityScore();
+            // Handle Drowsiness — tolerant, human-friendly approach
+            if (data.drowsiness === 'deep_sleep') {
+                // 60+ seconds eyes closed → alarm immediately
+                if (!alarmActive) {
+                    triggerAlarm(`Wake Up! You've been asleep for ${data.eye_closed_seconds || 60}s!`);
+                    dashboard.addLog(icon('warning') + ` Deep sleep detected (${data.eye_closed_seconds}s)`, 'danger');
+                    sendPushNotification('WAKE UP!', 'You fell asleep during your focus session!');
+                }
+            } else if (data.drowsiness === 'microsleep') {
+                // 15-60s eyes closed → count episodes, only warn after repeated
+                drowsinessEpisodes++;
+                if (drowsinessEpisodes >= 4 && !alarmActive) {
+                    triggerAlarm('You keep falling asleep! Take a break.');
+                    dashboard.addLog(icon('warning') + ` Repeated microsleep (episode #${drowsinessEpisodes})`, 'danger');
+                } else if (drowsinessEpisodes >= 2 && Date.now() - lastDrowsinessTime > DROWSY_COOLDOWN_MS) {
+                    lastDrowsinessTime = Date.now();
+                    showNotification('Microsleep Detected', `You dozed off for ${data.eye_closed_seconds || 15}s. Stay awake!`, 'warning');
+                    dashboard.addLog(icon('warning') + ` Microsleep #${drowsinessEpisodes} (${data.eye_closed_seconds}s)`, 'warning');
+                }
+            } else if (data.drowsiness === 'drowsy') {
+                // 3-15s eyes closed → just log silently first few times
+                drowsinessEpisodes++;
+                if (drowsinessEpisodes >= DROWSY_TOLERANCE && Date.now() - lastDrowsinessTime > DROWSY_COOLDOWN_MS) {
+                    lastDrowsinessTime = Date.now();
+                    showNotification('Feeling Drowsy?', 'Your eyes have been closing. Wake up!', 'warning');
+                    dashboard.addLog(icon('warning') + ` Drowsiness episode #${drowsinessEpisodes}`, 'warning');
+                }
+            } else {
+                // Eyes open → gradually forgive past episodes (1 forgiven per open frame)
+                if (drowsinessEpisodes > 0) drowsinessEpisodes = Math.max(0, drowsinessEpisodes - 0.05);
+            }
+
+            const activityScore = isWatchingVideo ? 100 : tracker.getActivityScore();
             session.updateFocusScore(data.smoothed_score || data.attention_score, activityScore);
 
             // Update webcam stat
@@ -257,30 +361,86 @@
             if (!webcamFailed) {
                 webcamFailed = true;
                 webcamEnabled = false;
-                dashboard.addLog('⚠️ Webcam lost — switched to keyboard/mouse-only mode', 'warning');
-                showNotification('📷 Webcam Disconnected', 'Scoring now uses keyboard/mouse only', 'warning');
+                dashboard.addLog(icon('warning') + ' Webcam lost — switched to keyboard/mouse-only mode', 'warning');
+                showNotification('Webcam Disconnected', 'Scoring now uses keyboard/mouse only', 'warning');
                 sendPushNotification('TrackerMode', 'Webcam disconnected — fallback mode active');
                 document.getElementById('stat-webcam-value').textContent = 'Offline';
                 updateIndicator('stat-webcam-indicator', 'danger');
             }
         };
 
-        // Screen capture events
-        screenCap.onCapture((data) => {
-            if (data.event === 'stopped') {
-                dashboard.addLog('🖥️ Screen capture stopped', 'warning');
-                screenEnabled = false;
-            }
-        });
+        // Screen capture removed in v2.4 — replaced by active window monitor
 
         // Activity tracker
         tracker.onActivityChange((status) => {
             if (!session.isRunning) return;
+            
+            if (status.mouseActive || status.keyboardActive) {
+                if (isWatchingVideo) {
+                    isWatchingVideo = false;
+                    showNotification('Video Mode Ended', 'Activity detected. Normal tracking resumed.', 'info');
+                    dashboard.addLog(icon('avg') + ' Video mode ended (activity detected)', 'info');
+                }
+            }
+
+            // --- Active App Monitor ---
+            const win = status.activeWindow;
+            if (win && win.title !== 'Unknown') {
+                const lowerTitle = win.title.toLowerCase();
+                let displayApp = win.app || win.title;
+                let displayIcon = '🖥️';
+
+                // Smart app detection for beautiful icons
+                if (lowerTitle.includes('youtube')) { displayApp = 'YouTube'; displayIcon = '▶️'; }
+                else if (lowerTitle.includes('whatsapp')) { displayApp = 'WhatsApp'; displayIcon = '💬'; }
+                else if (lowerTitle.includes('visual studio code') || lowerTitle.includes('vscode') || lowerTitle.includes('cursor')) { displayApp = 'VS Code'; displayIcon = '💻'; }
+                else if (lowerTitle.includes('discord')) { displayApp = 'Discord'; displayIcon = '🎮'; }
+                else if (lowerTitle.includes('netflix')) { displayApp = 'Netflix'; displayIcon = '🍿'; }
+                else if (lowerTitle.includes('instagram')) { displayApp = 'Instagram'; displayIcon = '📸'; }
+                else if (lowerTitle.includes('tiktok')) { displayApp = 'TikTok'; displayIcon = '🎵'; }
+                else if (lowerTitle.includes('spotify')) { displayApp = 'Spotify'; displayIcon = '🎧'; }
+                else if (lowerTitle.includes('github')) { displayApp = 'GitHub'; displayIcon = '🐙'; }
+                else if (lowerTitle.includes('chatgpt') || lowerTitle.includes('openai')) { displayApp = 'ChatGPT'; displayIcon = '🤖'; }
+                else if (lowerTitle.includes('chrome') || lowerTitle.includes('edge') || lowerTitle.includes('brave') || lowerTitle.includes('firefox')) { displayApp = 'Browser'; displayIcon = '🌐'; }
+                else if (win.matched_keyword) {
+                    displayApp = win.matched_keyword.charAt(0).toUpperCase() + win.matched_keyword.slice(1);
+                    displayIcon = '📱';
+                }
+
+                document.getElementById('active-app-name').textContent = displayApp;
+                document.getElementById('active-window-title').textContent = win.title;
+                document.getElementById('active-window-title').title = win.title;
+                document.getElementById('app-monitor-icon').textContent = displayIcon;
+                
+                const statusEl = document.getElementById('active-app-status');
+                const bgEl = document.getElementById('app-monitor-bg');
+                
+                // If it's a known distraction and not whitelisted yet
+                if (win.is_distraction && !whitelistedApps.has((win.matched_keyword || '').toLowerCase())) {
+                    statusEl.textContent = '⚠️ Distraction';
+                    statusEl.className = 'app-monitor-status distraction';
+                    if (bgEl) bgEl.className = 'app-monitor-bg distraction';
+                    
+                    // Show distraction prompt (first time per app per session)
+                    const appKey = (win.matched_keyword || displayApp).toLowerCase();
+                    if (!whitelistedApps.has(appKey) && distractionPrompt.classList.contains('hidden')) {
+                        lastDistractionApp = displayApp;
+                        document.getElementById('distraction-app-name').textContent = `${lastDistractionApp} Detected`;
+                        distractionPrompt.classList.remove('hidden');
+                        dashboard.addLog(icon('warning') + ` Distraction detected: ${lastDistractionApp}`, 'warning');
+                    }
+                } else {
+                    statusEl.textContent = '✅ On Task';
+                    statusEl.className = 'app-monitor-status on-task';
+                    if (bgEl) bgEl.className = 'app-monitor-bg on-task';
+                }
+            }
+
             if (!status.mouseActive && cursorEnabled) {
-                dashboard.addLog(`🖱️ Mouse idle for ${status.mouseIdleSeconds}s`, 'warning');
+                dashboard.addLog(icon('mouse') + ` Mouse idle for ${status.mouseIdleSeconds}s`, 'warning');
             }
             if (!status.keyboardActive && keyboardEnabled) {
-                dashboard.addLog(`⌨️ Keyboard idle for ${status.keyIdleSeconds}s`, 'warning');
+                dashboard.addLog(icon('keyboard') + ` Keyboard idle for ${status.keyIdleSeconds}s`, 'warning');
             }
         });
 
@@ -302,10 +462,11 @@
                 document.getElementById('stat-keyboard-value').textContent = status.keyboardActive ? 'Active' : `Idle ${status.keyIdleSeconds}s`;
                 updateIndicator('stat-keyboard-indicator', status.keyboardActive ? 'active' : 'warning');
             }
-            document.getElementById('stat-avg-value').textContent = `${avgScore}%`;
+            // LOGIC-1: avgScore can be null on first tick before any scoring
+            document.getElementById('stat-avg-value').textContent = `${avgScore ?? 0}%`;
 
             if (!webcamEnabled) {
-                const activityScore = tracker.getActivityScore();
+                const activityScore = isWatchingVideo ? 100 : tracker.getActivityScore();
                 session.updateFocusScore(null, activityScore);
                 // Update floating bar without webcam data
                 updateFloatingBar(null, status);
@@ -322,6 +483,20 @@
         // Alert — show PiP bar + check for alarm + SMART COOLDOWN
         session.onAlert = (score) => {
             const now = Date.now();
+            
+            // Checking if we should show the video prompt instead of normal alert
+            const status = tracker.getStatus();
+            if (!isWatchingVideo && latestWebcamData && latestWebcamData.looking_at_screen && (status.mouseIdleSeconds > 30 || status.keyIdleSeconds > 30)) {
+                // User is looking at screen but inactive. Show video prompt.
+                if (videoPrompt.classList.contains('hidden')) {
+                    videoPrompt.classList.remove('hidden');
+                    dashboard.addLog(icon('screen') + ' Showing Video prompt due to inactivity', 'info');
+                }
+                // Suppress normal alert while asking, but still count cooldown logic below if we wanted
+                // We just return to skip this alert entirely this tick
+                return;
+            }
+
             // Smart cooldown: skip if less than 30s since last alert
             if (now - lastAlertTime < ALERT_COOLDOWN_MS) {
                 consecutiveLowCount++; // still count for alarm trigger
@@ -335,40 +510,37 @@
             let severity = 'warning';
             if (consecutiveLowCount >= 4) severity = 'danger';
 
-            showPipAlert('⚠️ Focus Dropping!', roast, score, severity);
-            showNotification('⚠️ Focus Dropping!', roast, severity);
-            pip.showAlert('⚠️ Focus Drop!', roast, severity);
-            dashboard.addLog(`⚠️ Focus alert — score: ${score}%`, severity);
+            showPipAlert('Focus Dropping!', roast, score, severity);
+            showNotification('Focus Dropping!', roast, severity);
+            pip.showAlert('Focus Drop!', roast, severity);
+            dashboard.addLog(icon('warning') + ` Focus alert — score: ${score}%`, severity);
 
             // Browser push notification
-            sendPushNotification('⚠️ Focus Dropping!', roast);
+            sendPushNotification('Focus Dropping!', roast);
 
             consecutiveLowCount++;
             // Trigger alarm after 3 consecutive alerts
             if (consecutiveLowCount >= 3 && !alarmActive) {
                 triggerAlarm(roast);
-                dashboard.addLog('🚨 ALARM — user seems away!', 'danger');
-                sendPushNotification('🚨 ALARM', 'You\'ve been unfocused for too long! Come back!');
+                dashboard.addLog(icon('alert') + ' ALARM — user seems away!', 'danger');
+                sendPushNotification('ALARM', 'You\'ve been unfocused for too long! Come back!');
             }
         };
 
         // Quiz — also trigger alarm (severe focus drop)
+        // LOGIC-5: Don't trigger alarm during quiz — avoid double overlay
         session.onQuiz = () => {
             quiz.show();
-            dashboard.addLog('⚡ Focus check quiz triggered!', 'danger');
-            // If score is very low, also sound alarm
-            if (consecutiveLowCount >= 2) {
-                triggerAlarm('Your focus is critically low!');
-            }
+            dashboard.addLog(icon('alert') + ' Focus check quiz triggered!', 'danger');
         };
 
         quiz.onComplete = (correct) => {
             if (correct) {
-                showNotification('✅ Correct!', 'Great, now get back to work!', 'success');
-                dashboard.addLog('✅ Quiz answered correctly', 'success');
+                showNotification('Correct!', 'Great, now get back to work!', 'success');
+                dashboard.addLog(icon('check') + ' Quiz answered correctly', 'success');
             } else {
-                showNotification('❌ Wrong!', 'Focus harder next time!', 'danger');
-                dashboard.addLog('❌ Quiz answered incorrectly', 'danger');
+                showNotification('Wrong Answer', 'Focus harder next time!', 'danger');
+                dashboard.addLog(icon('warning') + ' Quiz answered incorrectly', 'danger');
             }
         };
 
@@ -379,8 +551,8 @@
 
         // Pomodoro: cycle complete → break time
         session.onCycleEnd = (cycleNum, breakSecs) => {
-            dashboard.addLog(`⏰ Cycle ${cycleNum} complete! Break time.`, 'success');
-            sendPushNotification('⏰ Cycle Complete!', `Cycle ${cycleNum} done. Take a ${Math.floor(breakSecs/60)}-minute break!`);
+            dashboard.addLog(icon('check') + ` Cycle ${cycleNum} complete! Break time.`, 'success');
+            sendPushNotification('Cycle Complete!', `Cycle ${cycleNum} done. Take a ${Math.floor(breakSecs/60)}-minute break!`);
             showBreakReminder(breakSecs, 'cycle');
         };
 
@@ -388,21 +560,22 @@
         session.onViolationBreak = () => {
             session.pause();
             document.getElementById('break-suggest').classList.remove('hidden');
-            dashboard.addLog('😤 Break suggestion shown', 'warning');
-            sendPushNotification('Break?', 'Kamu sudah kehilangan fokus beberapa kali. Break dulu?');
+            dashboard.addLog(icon('pause') + ' Break suggestion shown', 'warning');
+            sendPushNotification("Take a Break?", "You've lost focus multiple times. Maybe take a short break?");
         };
     }
 
     function togglePause() {
         const paused = session.togglePause();
-        const icon = btnPause.querySelector('svg');
+        tracker.paused = paused; // EDGE-5: stop polling during pause
+        const svgIcon = btnPause.querySelector('svg');
         if (paused) {
-            icon.innerHTML = '<polygon points="5,3 19,12 5,21" fill="currentColor"/>';
-            dashboard.addLog('⏸️ Session paused', 'info');
-            showNotification('⏸️ Paused', 'Click play to resume.', 'warning');
+            svgIcon.innerHTML = '<polygon points="5,3 19,12 5,21" fill="currentColor"/>';
+            dashboard.addLog(icon('pause') + ' Session paused', 'info');
+            showNotification('Paused', 'Click play to resume.', 'warning');
         } else {
-            icon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
-            dashboard.addLog('▶️ Session resumed', 'info');
+            svgIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+            dashboard.addLog(icon('play') + ' Session resumed', 'info');
         }
     }
 
@@ -413,14 +586,14 @@
     async function showSummary(summary) {
         tracker.stop();
         webcam.stop();
-        screenCap.stop();
         pip.stop();
         dismissAlarm();
+        document.title = 'TrackerMode \u2014 Focus Tracker'; // UX-4: reset tab title
         pipAlert.classList.add('hidden');
         consecutiveLowCount = 0;
 
         document.getElementById('summary-duration').textContent = summary.durationFormatted;
-        document.getElementById('summary-focus').textContent = `${summary.avgFocus}%`;
+        document.getElementById('summary-focus').textContent = `${summary.avgFocus ?? 0}%`;
         document.getElementById('summary-alerts').textContent = summary.notifications;
         document.getElementById('summary-quizzes').textContent = summary.quizzes;
 
@@ -435,7 +608,7 @@
         switchScreen(summaryScreen);
 
         // Push notification for session complete
-        sendPushNotification('🎉 Session Complete!', `${summary.cyclesCompleted} cycles done. Average focus: ${summary.avgFocus}%.`);
+        sendPushNotification('Session Complete!', `${summary.cyclesCompleted} cycles done. Average focus: ${summary.avgFocus}%.`);
     }
 
     async function triggerAIAnalysis() {
@@ -468,7 +641,12 @@
             aiLoading.style.display = 'none';
             aiResult.style.display = 'block';
 
-            let html = data.analysis
+            // SEC-2: Sanitize AI output before rendering as HTML
+            const safe = data.analysis
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            let html = safe
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\n/g, '<br>');
             aiResult.innerHTML = html;
@@ -545,18 +723,18 @@
         const offset = circumference - (score / 100) * circumference;
         scoreRingFill.style.strokeDashoffset = offset;
 
-        scoreStatus.className = 'score-status';
+        scoreStatus.className = 'focus-status-badge';
         if (score >= 70) {
-            scoreStatus.textContent = '🟢 Excellent Focus';
+            scoreStatus.innerHTML = '<span class="status-dot good"></span> Excellent Focus';
             scoreStatus.classList.add('good');
         } else if (score >= 50) {
-            scoreStatus.textContent = '🟡 Moderate Focus';
+            scoreStatus.innerHTML = '<span class="status-dot warning"></span> Moderate Focus';
             scoreStatus.classList.add('warning');
         } else if (score >= 30) {
-            scoreStatus.textContent = '🟠 Low Focus — Stay alert!';
+            scoreStatus.innerHTML = '<span class="status-dot warning"></span> Low Focus — Stay alert!';
             scoreStatus.classList.add('warning');
         } else {
-            scoreStatus.textContent = '🔴 Very Low — Action needed!';
+            scoreStatus.innerHTML = '<span class="status-dot danger"></span> Very Low — Action needed!';
             scoreStatus.classList.add('danger');
         }
 
@@ -573,11 +751,16 @@
     }
 
     function showNotification(title, message, type = 'warning') {
-        const icons = { warning: '⚠️', danger: '🚨', success: '✅', info: 'ℹ️' };
+        const notifIcons = {
+            warning: `<img src="${ICONS.warning}" style="width:20px;height:20px">`,
+            danger: `<img src="${ICONS.alert}" style="width:20px;height:20px">`,
+            success: `<img src="${ICONS.check}" style="width:20px;height:20px">`,
+            info: `<img src="${ICONS.avg}" style="width:20px;height:20px">`
+        };
         const notif = document.createElement('div');
         notif.className = `notification ${type}`;
         notif.innerHTML = `
-            <span class="notif-icon">${icons[type] || '📢'}</span>
+            <span class="notif-icon">${notifIcons[type] || notifIcons.warning}</span>
             <div class="notif-content">
                 <div class="notif-title">${title}</div>
                 <div class="notif-msg">${message}</div>
@@ -596,7 +779,12 @@
 
     // --- PiP Alert Bar ---
     function showPipAlert(title, message, score, type = 'warning') {
-        document.getElementById('pip-alert-icon').textContent = type === 'danger' ? '🚨' : type === 'success' ? '✅' : '⚠️';
+        const pipIconMap = {
+            danger: ICONS.alert,
+            success: ICONS.check,
+            warning: ICONS.warning
+        };
+        document.getElementById('pip-alert-icon').innerHTML = `<img src="${pipIconMap[type] || pipIconMap.warning}" class="pip-icon-img" alt="alert">`;
         document.getElementById('pip-alert-title').textContent = title;
         document.getElementById('pip-alert-msg').textContent = message;
         document.getElementById('pip-alert-score').textContent = score;
@@ -618,10 +806,15 @@
         if (alarmActive) return;
         alarmActive = true;
 
-        document.getElementById('alarm-msg').textContent = message || 'You\'ve been unfocused for too long!';
+        const msg = message || 'You\'ve been unfocused for too long!';
+        document.getElementById('alarm-msg').textContent = msg;
         alarmOverlay.classList.remove('hidden');
 
-        // Play alarm sound (loop)
+        // Visual notifications FIRST (in case laptop is muted)
+        showNotification('🚨 Focus Lost!', msg, 'danger');
+        sendPushNotification('🚨 Focus Lost!', msg);
+
+        // Then play alarm sound (loop)
         alarmSound.currentTime = 0;
         alarmSound.play().catch(err => {
             console.warn('Audio play blocked:', err);
@@ -639,12 +832,17 @@
     function sendPushNotification(title, body) {
         if (!pushPermission || !('Notification' in window) || Notification.permission !== 'granted') return;
         try {
-            new Notification(title, {
+            const notif = new Notification(title, {
                 body: body,
                 icon: '/static/favicon.svg',
                 silent: false,
                 tag: 'trackermode-alert'
             });
+            notif.onclick = function(e) {
+                e.preventDefault();
+                window.focus();
+                notif.close();
+            };
         } catch(e) {
             console.warn('Push notification failed:', e);
         }
@@ -652,12 +850,16 @@
 
     // --- POMODORO BREAK REMINDER ---
     function showBreakReminder(breakDurationSecs, breakType) {
+        // BUG-3 fix: remove any existing break overlay first
+        const existing = document.querySelector('.break-overlay');
+        if (existing) existing.remove();
+
         const overlay = document.createElement('div');
         overlay.className = 'break-overlay';
 
         const breakMins = Math.floor(breakDurationSecs / 60);
         const isLongBreak = breakType === 'final';
-        const icon = breakType === 'violation' ? '😤' : '☕';
+        const breakIcon = breakType === 'violation' ? icon('warning', 40) : icon('pause', 40);
         const title = breakType === 'violation' ? 'Quick Break!' : (isLongBreak ? 'Long Break — You\'ve earned it!' :'Pomodoro Break!');
         const msg = breakType === 'violation'
             ? 'Refresh your mind. Stand up and stretch.'
@@ -665,7 +867,7 @@
 
         overlay.innerHTML = `
             <div class="break-content">
-                <div class="break-icon">${icon}</div>
+                <div class="break-icon">${breakIcon}</div>
                 <h2 class="break-title">${title}</h2>
                 <p class="break-msg">${msg}</p>
                 <div class="break-timer" id="break-countdown">${breakMins}:00</div>
@@ -696,19 +898,19 @@
     }
 
     function onBreakComplete(breakType) {
-        sendPushNotification('⏰ Break Over!', 'Ready for the next focus session?');
+        sendPushNotification('Break Over!', 'Ready for the next focus session?');
 
         if (breakType === 'violation') {
             // Resume remaining time
             session.resumeFromBreak();
-            dashboard.addLog('▶️ Session resumed after break', 'success');
-            showNotification('⚡ Let\'s go!', 'Session resumed. Stay focused!', 'success');
+            dashboard.addLog(icon('play') + ' Session resumed after break', 'success');
+            showNotification('Let\'s go!', 'Session resumed. Stay focused!', 'success');
         } else if (breakType === 'cycle') {
             // Start next cycle
             session.startNextCycle();
             document.getElementById('cycle-badge').textContent = `Cycle ${session.currentCycle}/${session.maxCycles}`;
-            dashboard.addLog(`▶️ Cycle ${session.currentCycle} started`, 'success');
-            showNotification('🌟 New Cycle!', `Cycle ${session.currentCycle} — Let\'s focus!`, 'success');
+            dashboard.addLog(icon('play') + ` Cycle ${session.currentCycle} started`, 'success');
+            showNotification('New Cycle!', `Cycle ${session.currentCycle} — Let\'s focus!`, 'success');
         }
     }
 

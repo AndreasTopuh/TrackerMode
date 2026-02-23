@@ -123,6 +123,7 @@ class AttentionAnalyzer:
         self.prev_ear = 0.3
         self.session_start = time.time()
         self.last_process_time = 0
+        self.eye_closed_start_time = None
 
     def analyze_frame(self, frame: np.ndarray) -> dict:
         if self.use_mediapipe:
@@ -167,6 +168,7 @@ class AttentionAnalyzer:
             "blink_rate": 0,
             "ear": 0,
             "gaze_ratio": 0.5,
+            "drowsiness": "none",
             "timestamp": time.time()
         }
 
@@ -193,8 +195,22 @@ class AttentionAnalyzer:
         ear = (left_ear + right_ear) / 2.0
         result["ear"] = round(ear, 3)
 
-        if ear < 0.2 and self.prev_ear >= 0.2:
-            self.blink_total += 1
+        if ear < 0.2:
+            if self.prev_ear >= 0.2:
+                self.blink_total += 1
+                self.eye_closed_start_time = time.time()
+            if self.eye_closed_start_time:
+                closed_duration = time.time() - self.eye_closed_start_time
+                result["eye_closed_seconds"] = round(closed_duration, 1)
+                if closed_duration > 60:
+                    result["drowsiness"] = "deep_sleep"
+                elif closed_duration > 15:
+                    result["drowsiness"] = "microsleep"
+                elif closed_duration > 3:
+                    result["drowsiness"] = "drowsy"
+        else:
+            self.eye_closed_start_time = None
+            
         self.prev_ear = ear
 
         result["eyes_open"] = ear >= 0.2
@@ -311,6 +327,7 @@ class AttentionAnalyzer:
             "looking_at_screen": False, "gaze_direction": "unknown",
             "eyes_open": True, "head_pose": "unknown",
             "blink_rate": 0, "ear": 0, "gaze_ratio": 0.5,
+            "drowsiness": "none",
             "timestamp": time.time()
         }
 
@@ -401,22 +418,22 @@ async def analyze_session_with_ai(session_data: dict) -> str:
         client = AsyncOpenAI(api_key=api_key)
 
         prompt = f"""You are a productivity coach AI analyzing a focus session. 
-Provide analysis in Bahasa Indonesia (casual, supportive tone).
+Provide analysis in English (casual, supportive tone).
 
 Session Data:
 - Task: {session_data.get('taskName', 'Unknown')}
 - Duration: {session_data.get('durationFormatted', '00:00')} ({session_data.get('duration', 0)} seconds)
-- Average Focus Score: {session_data.get('avgFocus', 0)}%
+- Average Focus Score: {session_data.get('avgFocus', 0) or 0}%
 - Total Alerts Triggered: {session_data.get('notifications', 0)}
 - Quizzes Triggered: {session_data.get('quizzes', 0)}
 - Focus Score History (sampled): {json.dumps(session_data.get('focusSample', []))}
 
 Analyze the session and provide:
-1. 📊 **Ringkasan Performa** (2-3 kalimat)
-2. 🔍 **Pola yang Terdeteksi** (kapan fokus turun, ada pattern?)
-3. 💡 **3 Saran Konkret** untuk improvement
-4. 🏆 **Rating** (A/B/C/D/F) dengan penjelasan singkat
-5. 🎯 **Target untuk Sesi Berikutnya**
+1. 📊 **Performance Summary** (2-3 sentences)
+2. 🔍 **Patterns Detected** (when did focus drop, any patterns?)
+3. 💡 **3 Concrete Suggestions** for improvement
+4. 🏆 **Rating** (A/B/C/D/F) with brief explanation
+5. 🎯 **Target for Next Session**
 
 Keep it concise, motivating, and actionable. Use emoji."""
 
@@ -436,10 +453,161 @@ Keep it concise, motivating, and actionable. Use emoji."""
 
 
 # ============================================================
+#  GLOBAL INPUT TRACKER (pynput — system-wide mouse/keyboard)
+# ============================================================
+
+# Default distraction keywords — matched against active window title
+DEFAULT_DISTRACTIONS = [
+    "whatsapp", "telegram", "discord", "line", "messenger",
+    "instagram", "tiktok", "facebook", "twitter", "threads",
+    "netflix", "twitch", "disney+", "hulu",
+    "shopee", "tokopedia", "lazada", "amazon shopping",
+    "steam", "valorant", "epic games", "riot client",
+    "spotify", "candy crush", "genshin"
+]
+
+
+class GlobalInputTracker:
+    """Tracks mouse/keyboard activity + active window across the entire OS."""
+
+    def __init__(self):
+        import threading
+        self.available = False
+        self.mouse_last_moved = time.time()
+        self.key_last_pressed = time.time()
+        self.mouse_idle_threshold = 30  # seconds
+        self.key_idle_threshold = 60    # seconds
+        self.mouse_listener = None
+        self.keyboard_listener = None
+        self._lock = threading.Lock()
+
+        # Active window tracking
+        self.gw_available = False
+        try:
+            import pygetwindow as gw
+            self._gw = gw
+            self.gw_available = True
+            print("[v2.4] pygetwindow loaded — active window tracking available")
+        except ImportError:
+            print("[v2.4] pygetwindow not installed — window tracking disabled")
+
+        # Distraction list (can be extended by user)
+        self.distraction_keywords = list(DEFAULT_DISTRACTIONS)
+        self.custom_distractions = []
+
+        try:
+            from pynput import mouse, keyboard
+            self._mouse_module = mouse
+            self._keyboard_module = keyboard
+            self.available = True
+            print("[v2.2] pynput loaded — global input tracking available")
+        except ImportError:
+            print("[v2.2] pynput not installed — global tracking disabled")
+
+    def start(self):
+        if not self.available:
+            return
+        try:
+            self.mouse_listener = self._mouse_module.Listener(
+                on_move=self._on_mouse_move,
+                on_click=self._on_mouse_click,
+                on_scroll=self._on_mouse_scroll
+            )
+            self.keyboard_listener = self._keyboard_module.Listener(
+                on_press=self._on_key_press
+            )
+            self.mouse_listener.daemon = True
+            self.keyboard_listener.daemon = True
+            self.mouse_listener.start()
+            self.keyboard_listener.start()
+            with self._lock:
+                self.mouse_last_moved = time.time()
+                self.key_last_pressed = time.time()
+            print("[v2.2] Global input listeners started")
+        except Exception as e:
+            print(f"[v2.2] Failed to start input listeners: {e}")
+            self.available = False
+
+    def stop(self):
+        if self.mouse_listener:
+            self.mouse_listener.stop()
+            self.mouse_listener = None
+        if self.keyboard_listener:
+            self.keyboard_listener.stop()
+            self.keyboard_listener = None
+
+    def get_active_window(self):
+        """Get the currently active window title and check for distractions."""
+        if not self.gw_available:
+            return {"title": "Unknown", "app": "Unknown", "is_distraction": False}
+        try:
+            win = self._gw.getActiveWindow()
+            if win is None:
+                return {"title": "Desktop", "app": "Desktop", "is_distraction": False}
+            title = win.title or "Unknown"
+            # Extract app name (last part after " - " or " — ")
+            parts = title.replace(" — ", " - ").split(" - ")
+            app_name = parts[-1].strip() if len(parts) > 1 else title.strip()
+            # Check distraction
+            title_lower = title.lower()
+            all_distractions = self.distraction_keywords + self.custom_distractions
+            is_distraction = any(d in title_lower for d in all_distractions)
+            matched = next((d for d in all_distractions if d in title_lower), None)
+            return {
+                "title": title,
+                "app": app_name,
+                "is_distraction": is_distraction,
+                "matched_keyword": matched
+            }
+        except Exception:
+            return {"title": "Unknown", "app": "Unknown", "is_distraction": False}
+
+    def add_custom_distractions(self, keywords: list):
+        """Add user-defined distraction keywords."""
+        for kw in keywords:
+            kw_lower = kw.strip().lower()
+            if kw_lower and kw_lower not in self.custom_distractions:
+                self.custom_distractions.append(kw_lower)
+
+    def get_status(self):
+        with self._lock:
+            now = time.time()
+            mouse_idle = now - self.mouse_last_moved
+            key_idle = now - self.key_last_pressed
+        result = {
+            "available": self.available,
+            "mouseActive": mouse_idle < self.mouse_idle_threshold,
+            "keyboardActive": key_idle < self.key_idle_threshold,
+            "mouseIdleSeconds": int(mouse_idle),
+            "keyIdleSeconds": int(key_idle),
+            "activeWindow": self.get_active_window()
+        }
+        return result
+
+    def _on_mouse_move(self, x, y):
+        with self._lock:
+            self.mouse_last_moved = time.time()
+
+    def _on_mouse_click(self, x, y, button, pressed):
+        with self._lock:
+            self.mouse_last_moved = time.time()
+
+    def _on_mouse_scroll(self, x, y, dx, dy):
+        with self._lock:
+            self.mouse_last_moved = time.time()
+
+    def _on_key_press(self, key):
+        with self._lock:
+            self.key_last_pressed = time.time()
+
+
+# ============================================================
 #  GLOBAL INSTANCES
 # ============================================================
 
 analyzer = AttentionAnalyzer()
+input_tracker = GlobalInputTracker()
+input_tracker.start()
 
 
 def decode_frame(data_url: str) -> Optional[np.ndarray]:
@@ -510,9 +678,29 @@ async def get_stats():
     return analyzer.get_stats()
 
 
+@app.get("/api/input-status")
+async def get_input_status():
+    """Global mouse/keyboard + active window from pynput/pygetwindow."""
+    return input_tracker.get_status()
+
+
+@app.post("/api/distractions")
+async def set_custom_distractions(request: Request):
+    """Let user add custom distraction keywords."""
+    data = await request.json()
+    keywords = data.get("keywords", [])
+    input_tracker.add_custom_distractions(keywords)
+    return {"status": "ok", "total": len(input_tracker.distraction_keywords) + len(input_tracker.custom_distractions)}
+
+
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "service": "TrackerMode v2.1", "mediapipe": analyzer.use_mediapipe}
+    return {
+        "status": "ok",
+        "service": "TrackerMode v2.2",
+        "mediapipe": analyzer.use_mediapipe,
+        "globalInput": input_tracker.available
+    }
 
 
 # Serve frontend
@@ -528,7 +716,7 @@ if os.path.exists(static_dir):
 if __name__ == "__main__":
     import uvicorn
     print("=" * 50)
-    print("  TrackerMode v2.1 — Focus Tracker Server")
+    print("  TrackerMode v2.4 — Focus Tracker Server")
     print(f"  MediaPipe: {'✅ Enabled' if analyzer.use_mediapipe else '❌ Fallback to Haar'}")
     print(f"  OpenAI: {'✅ Key found' if os.getenv('OPENAI_API_KEY') else '❌ No key'}")
     print("  http://localhost:8000")

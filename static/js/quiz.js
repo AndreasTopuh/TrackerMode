@@ -195,9 +195,15 @@ class QuizSystem {
 
     static _shuffleOptions(correct, faker) {
         const opts = new Set([correct]);
-        while (opts.size < 4) {
+        let guard = 0;
+        while (opts.size < 4 && guard < 100) {
+            guard++;
             const fake = faker();
             if (fake !== correct && fake > 0) opts.add(fake);
+        }
+        // Fill remaining with offset values if guard hit
+        while (opts.size < 4) {
+            opts.add(correct + opts.size * 3);
         }
         return [...opts].sort(() => Math.random() - 0.5);
     }

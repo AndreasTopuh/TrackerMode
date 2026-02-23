@@ -98,6 +98,10 @@ class ScreenCapture {
             cb(data);
         }
     }
+
+    clearListeners() {
+        this.listeners = [];
+    }
 }
 
 window.ScreenCapture = ScreenCapture;
