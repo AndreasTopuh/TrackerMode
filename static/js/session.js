@@ -1,6 +1,7 @@
 /**
- * TrackerMode v2.3 — Session Manager
- * Manages focus session timer, Pomodoro cycles, and triggers alerts/quizzes.
+ * TrackerMode v2.4 — Session Manager
+ * Manages focus session timer, Pomodoro cycles, triggers alerts/quizzes,
+ * and tracks app/window time usage for end-of-session evaluation.
  */
 
 class SessionManager {
@@ -53,6 +54,10 @@ class SessionManager {
         this.onSessionEnd = null;
         this.onCycleEnd = null;        // Pomodoro: cycle complete → break time
         this.onViolationBreak = null;  // Pomodoro: suggest break after violations
+
+        // Window/app time tracking
+        this.windowTimeData = [];
+        this._windowTimePollInterval = null;
     }
 
     start(durationMinutes, taskName, activeFeatures = { webcam: true, cursor: true, keyboard: true, window: true }) {
@@ -70,6 +75,7 @@ class SessionManager {
         this.cursorScores = [];
         this.keyboardScores = [];
         this.windowScores = [];
+        this.windowTimeData = [];
 
         this.alertLevel = 0;
         this.lowFocusStreak = 0;
@@ -139,13 +145,21 @@ class SessionManager {
                 this._checkFocus();
             }
         }, this.checkIntervalMs);
+
+        // Poll window/app time every 10 seconds
+        if (this._windowTimePollInterval) clearInterval(this._windowTimePollInterval);
+        this._windowTimePollInterval = setInterval(() => {
+            if (!this.isPaused) this._pollWindowTime();
+        }, 10000);
     }
 
     _stopTimers() {
         if (this.timerInterval) clearInterval(this.timerInterval);
         if (this.focusCheckInterval) clearInterval(this.focusCheckInterval);
+        if (this._windowTimePollInterval) clearInterval(this._windowTimePollInterval);
         this.timerInterval = null;
         this.focusCheckInterval = null;
+        this._windowTimePollInterval = null;
     }
 
     pause() { this.isPaused = true; }
@@ -259,6 +273,7 @@ class SessionManager {
             totalScores: this.focusScores.length,
             focusHistory: this.focusScores,
             cyclesCompleted: this.currentCycle,
+            windowTimeData: this.windowTimeData,
             metrics: {
                 webcam: {
                     active: this.activeFeatures.webcam,
@@ -311,6 +326,17 @@ class SessionManager {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
         return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    async _pollWindowTime() {
+        try {
+            const resp = await fetch('/api/window-time');
+            if (resp.ok) {
+                this.windowTimeData = await resp.json();
+            }
+        } catch (e) {
+            // Silently ignore poll failures
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 """
-TrackerMode v2.4 — PyInstaller Build Script
+TrackerMode v2.5 — PyInstaller Build Script
 Mengonversi Project menjadi Single Executable (.exe) untuk Windows.
 """
 

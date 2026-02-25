@@ -1841,6 +1841,43 @@ body {
     font-weight: 800;
 }
 
+/* App Time Breakdown */
+.app-time-desc {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    margin-top: -0.5rem;
+}
+
+.app-time-table td:nth-child(4) {
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+}
+
+.app-time-table td:nth-child(2) {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.app-time-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    overflow: hidden;
+    min-width: 80px;
+}
+
+.app-time-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--accent-primary);
+}
+
 /* Score Ring */
 .summary-score-ring {
     position: relative;

@@ -838,6 +838,39 @@
         // Store summary for AI button
         lastSummary = summary;
 
+        // Fetch final window time data and render app time breakdown
+        try {
+            const wtResp = await fetch('/api/window-time');
+            if (wtResp.ok) {
+                summary.windowTimeData = await wtResp.json();
+            }
+        } catch (e) { /* ignore */ }
+
+        const appTimeBody = document.getElementById('app-time-body');
+        if (appTimeBody && summary.windowTimeData && summary.windowTimeData.length > 0) {
+            let appHtml = '';
+            const topApps = summary.windowTimeData.slice(0, 10);  // Show top 10
+            topApps.forEach((item, idx) => {
+                const barColor = idx === 0 ? 'var(--primary-color)' : idx < 3 ? 'var(--accent-color)' : 'var(--text-muted)';
+                appHtml += `
+                    <tr>
+                        <td><strong>${item.app}</strong></td>
+                        <td>${item.duration}</td>
+                        <td>
+                            <div class="app-time-bar-bg">
+                                <div class="app-time-bar-fill" style="width: ${item.percentage}%; background: ${barColor};"></div>
+                            </div>
+                        </td>
+                        <td style="font-weight: 600;">${item.percentage}%</td>
+                    </tr>
+                `;
+            });
+            appTimeBody.innerHTML = appHtml;
+            document.getElementById('app-time-section').style.display = 'block';
+        } else if (document.getElementById('app-time-section')) {
+            document.getElementById('app-time-section').style.display = 'none';
+        }
+
         // Reset AI section
         document.getElementById('ai-idle').style.display = 'block';
         document.getElementById('ai-loading').style.display = 'none';
@@ -872,7 +905,7 @@
             const response = await fetch('/api/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...lastSummary, focusSample })
+                body: JSON.stringify({ ...lastSummary, focusSample, windowTimeData: lastSummary.windowTimeData || [] })
             });
 
             const data = await response.json();
