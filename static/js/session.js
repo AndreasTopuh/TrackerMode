@@ -55,13 +55,22 @@ class SessionManager {
         this.onViolationBreak = null;  // Pomodoro: suggest break after violations
     }
 
-    start(durationMinutes, taskName) {
+    start(durationMinutes, taskName, activeFeatures = { webcam: true, cursor: true, keyboard: true, window: true }) {
         this.duration = durationMinutes * 60;
         this.elapsed = 0;
         this.taskName = taskName || 'Focus Session';
+        this.activeFeatures = activeFeatures; // Track which features are enabled
+
         this.isRunning = true;
         this.isPaused = false;
+        
+        // Detailed scoring history
         this.focusScores = [];
+        this.webcamScores = [];
+        this.cursorScores = [];
+        this.keyboardScores = [];
+        this.windowScores = [];
+
         this.alertLevel = 0;
         this.lowFocusStreak = 0;
         this.notificationCount = 0;
@@ -165,29 +174,60 @@ class SessionManager {
         }
     }
 
-    updateFocusScore(webcamScore, activityScore) {
-        let combined;
-        if (webcamScore !== null && webcamScore !== undefined) {
-            if (webcamScore >= 80) {
-                // High webcam confidence — user is clearly focused (e.g. reading)
-                // Webcam dominates, activity is bonus only
-                combined = Math.round(webcamScore * 0.85 + activityScore * 0.15);
-            } else if (webcamScore >= 50) {
-                // Moderate webcam — face detected, mixed signals
-                combined = Math.round(webcamScore * 0.65 + activityScore * 0.35);
-            } else {
-                // Low webcam (no face or looking away) — activity matters more
-                combined = Math.round(webcamScore * 0.35 + activityScore * 0.65);
-            }
-        } else {
-            // No webcam — activity only
-            combined = activityScore;
+    updateFocusScore(scores) {
+        // scores = { webcam: number|null, cursor: number|null, keyboard: number|null, window: number|null }
+        let totalWeight = 0;
+        let weightedSum = 0;
+
+        // Dynamic weights based on active features
+        const weights = {
+            webcam: 0.40,
+            cursor: 0.20,
+            keyboard: 0.20,
+            window: 0.20
+        };
+
+        // If webcam is off, redistribute its weight to activity
+        if (!this.activeFeatures.webcam) {
+            weights.cursor = 0.33;
+            weights.keyboard = 0.33;
+            weights.window = 0.34;
         }
+
+        // Tally up active components
+        if (this.activeFeatures.webcam && scores.webcam !== null && scores.webcam !== undefined) {
+            weightedSum += scores.webcam * weights.webcam;
+            totalWeight += weights.webcam;
+            this.webcamScores.push(scores.webcam);
+        }
+        if (this.activeFeatures.cursor && scores.cursor !== null && scores.cursor !== undefined) {
+            weightedSum += scores.cursor * weights.cursor;
+            totalWeight += weights.cursor;
+            this.cursorScores.push(scores.cursor);
+        }
+        if (this.activeFeatures.keyboard && scores.keyboard !== null && scores.keyboard !== undefined) {
+            weightedSum += scores.keyboard * weights.keyboard;
+            totalWeight += weights.keyboard;
+            this.keyboardScores.push(scores.keyboard);
+        }
+        if (this.activeFeatures.window && scores.window !== null && scores.window !== undefined) {
+            weightedSum += scores.window * weights.window;
+            totalWeight += weights.window;
+            this.windowScores.push(scores.window);
+        }
+
+        const combined = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+        
         this.currentFocusScore = combined;
         this.focusScores.push({ score: combined, time: this.elapsed });
+        
         // Limit memory: keep last 2000 entries (~100 min at 3s intervals)
         if (this.focusScores.length > 2000) {
             this.focusScores.shift();
+            if (this.webcamScores.length > 2000) this.webcamScores.shift();
+            if (this.cursorScores.length > 2000) this.cursorScores.shift();
+            if (this.keyboardScores.length > 2000) this.keyboardScores.shift();
+            if (this.windowScores.length > 2000) this.windowScores.shift();
         }
     }
 
@@ -199,9 +239,13 @@ class SessionManager {
     }
 
     getAverageFocus() {
-        if (this.focusScores.length === 0) return null;
-        const sum = this.focusScores.reduce((a, b) => a + b.score, 0);
-        return Math.round(sum / this.focusScores.length);
+        return this._getAverage(this.focusScores.map(f => f.score));
+    }
+
+    _getAverage(arr) {
+        if (!arr || arr.length === 0) return null;
+        const sum = arr.reduce((a, b) => a + b, 0);
+        return Math.round(sum / arr.length);
     }
 
     getSummary() {
@@ -214,7 +258,29 @@ class SessionManager {
             taskName: this.taskName,
             totalScores: this.focusScores.length,
             focusHistory: this.focusScores,
-            cyclesCompleted: this.currentCycle
+            cyclesCompleted: this.currentCycle,
+            metrics: {
+                webcam: {
+                    active: this.activeFeatures.webcam,
+                    score: this._getAverage(this.webcamScores),
+                    weight: this.activeFeatures.webcam ? 0.40 : 0
+                },
+                cursor: {
+                    active: this.activeFeatures.cursor,
+                    score: this._getAverage(this.cursorScores),
+                    weight: this.activeFeatures.webcam ? 0.20 : 0.33
+                },
+                keyboard: {
+                    active: this.activeFeatures.keyboard,
+                    score: this._getAverage(this.keyboardScores),
+                    weight: this.activeFeatures.webcam ? 0.20 : 0.33
+                },
+                window: {
+                    active: this.activeFeatures.window,
+                    score: this._getAverage(this.windowScores),
+                    weight: this.activeFeatures.webcam ? 0.20 : 0.34
+                }
+            }
         };
     }
 

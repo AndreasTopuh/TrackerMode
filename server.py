@@ -1,6 +1,7 @@
 """
-TrackerMode v2.1 — Focus Tracker Backend Server
+TrackerMode v2.4 — Focus Tracker Backend Server
 FastAPI + WebSocket + MediaPipe FaceLandmarker (Tasks API) + OpenAI Analysis
+Desktop-ready: PyInstaller compatible with auto-open browser.
 """
 
 import cv2
@@ -9,10 +10,13 @@ import base64
 import json
 import time
 import os
+import sys
 import math
+import webbrowser
 import urllib.request
 from io import BytesIO
 from typing import Optional
+from threading import Timer
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,9 +37,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ============================================================
+#  PyInstaller path helper
+# ============================================================
+def resource_path(relative_path: str) -> str:
+    """Resolve file path for both dev mode and PyInstaller .exe bundle."""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled .exe — files are extracted to sys._MEIPASS
+        base_path = sys._MEIPASS
+    else:
+        # Running from source
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
+
+
 # Model download URL
 FACE_LANDMARKER_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "face_landmarker.task")
+MODEL_PATH = resource_path("face_landmarker.task")
 
 
 def download_model():
@@ -417,8 +436,9 @@ async def analyze_session_with_ai(session_data: dict) -> str:
         from openai import AsyncOpenAI
         client = AsyncOpenAI(api_key=api_key)
 
-        prompt = f"""You are a productivity coach AI analyzing a focus session. 
-Provide analysis in English (casual, supportive tone).
+        prompt = f"""You are a productivity coach AI analyzing a focus session.
+Provide a very brief analysis. Return your response in simple markdown containing NO headings, just short bullet points and bold text for emphasis.
+Keep it extremely concise (3-4 bullet points max) and actionable. Use emoji.
 
 Session Data:
 - Task: {session_data.get('taskName', 'Unknown')}
@@ -427,27 +447,19 @@ Session Data:
 - Total Alerts Triggered: {session_data.get('notifications', 0)}
 - Quizzes Triggered: {session_data.get('quizzes', 0)}
 - Focus Score History (sampled): {json.dumps(session_data.get('focusSample', []))}
-
-Analyze the session and provide:
-1. 📊 **Performance Summary** (2-3 sentences)
-2. 🔍 **Patterns Detected** (when did focus drop, any patterns?)
-3. 💡 **3 Concrete Suggestions** for improvement
-4. 🏆 **Rating** (A/B/C/D/F) with brief explanation
-5. 🎯 **Target for Next Session**
-
-Keep it concise, motivating, and actionable. Use emoji."""
+"""
 
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a supportive productivity coach AI."},
+                {"role": "system", "content": "You are a supportive, very concise productivity coach AI."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=800,
+            max_tokens=300,
             temperature=0.7
         )
 
-        return response.choices[0].message.content
+        return response.choices[0].message.content or ""
     except Exception as e:
         return f"❌ AI Analysis error: {str(e)}"
 
@@ -457,14 +469,7 @@ Keep it concise, motivating, and actionable. Use emoji."""
 # ============================================================
 
 # Default distraction keywords — matched against active window title
-DEFAULT_DISTRACTIONS = [
-    "whatsapp", "telegram", "discord", "line", "messenger",
-    "instagram", "tiktok", "facebook", "twitter", "threads",
-    "netflix", "twitch", "disney+", "hulu",
-    "shopee", "tokopedia", "lazada", "amazon shopping",
-    "steam", "valorant", "epic games", "riot client",
-    "spotify", "candy crush", "genshin"
-]
+DEFAULT_DISTRACTIONS = []
 
 
 class GlobalInputTracker:
@@ -704,7 +709,7 @@ async def health_check():
 
 
 # Serve frontend
-static_dir = os.path.join(os.path.dirname(__file__), "static")
+static_dir = resource_path("static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -715,10 +720,25 @@ if os.path.exists(static_dir):
 
 if __name__ == "__main__":
     import uvicorn
+    import multiprocessing
+    
+    # WAJIB untuk PyInstaller agar tidak looping saat buka tracker
+    multiprocessing.freeze_support() 
+
+    HOST = "127.0.0.1"
+    PORT = 8000
+    
     print("=" * 50)
-    print("  TrackerMode v2.4 — Focus Tracker Server")
-    print(f"  MediaPipe: {'✅ Enabled' if analyzer.use_mediapipe else '❌ Fallback to Haar'}")
-    print(f"  OpenAI: {'✅ Key found' if os.getenv('OPENAI_API_KEY') else '❌ No key'}")
-    print("  http://localhost:8000")
+    print(" TrackerMode v2.4 — Focus Tracker Server")
+    print(f" Frozen (exe): {getattr(sys, 'frozen', False)}")
+    print(f" http://{HOST}:{PORT}")
     print("=" * 50)
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    # Auto-open browser
+    def open_browser():
+        webbrowser.open_new(f"http://{HOST}:{PORT}")
+    
+    Timer(1.5, open_browser).start()
+    
+    # Jalankan server
+    uvicorn.run(app, host=HOST, port=PORT, log_level="info")

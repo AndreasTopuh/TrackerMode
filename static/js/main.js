@@ -107,13 +107,138 @@
             document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             selectedDuration = parseInt(btn.dataset.minutes);
+            // Clear custom input when preset is selected
+            const customInput = document.getElementById('custom-duration');
+            if (customInput) customInput.value = '';
         });
     });
 
+    // --- Custom Duration Input ---
+    const customDurationInput = document.getElementById('custom-duration');
+    if (customDurationInput) {
+        customDurationInput.addEventListener('input', () => {
+            const val = parseInt(customDurationInput.value);
+            if (val && val > 0) {
+                // Deselect all preset buttons
+                document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+                selectedDuration = Math.min(val, 240);
+            }
+        });
+        customDurationInput.addEventListener('blur', () => {
+            const val = parseInt(customDurationInput.value);
+            if (!val || val <= 0) {
+                // Re-select the default if nothing valid typed
+                if (!document.querySelector('.duration-btn.active')) {
+                    const defaultBtn = document.querySelector('.duration-btn[data-minutes="25"]');
+                    if (defaultBtn) {
+                        defaultBtn.classList.add('active');
+                        selectedDuration = 25;
+                    }
+                }
+            }
+        });
+    }
+
+    // --- Feature Card Expand/Collapse ---
+    document.querySelectorAll('.feature-card[data-expandable]').forEach(card => {
+        const header = card.querySelector('.feature-card-header');
+        if (header) {
+            header.addEventListener('click', (e) => {
+                // Don't expand if clicking the toggle switch itself
+                if (e.target.closest('.toggle-switch')) return;
+                card.classList.toggle('expanded');
+            });
+        }
+    });
+
+    // --- Tag Input (Distraction Apps) ---
+    const tagContainer = document.getElementById('distraction-tags');
+    const tagInput = document.getElementById('distraction-input');
+    const btnAddTag = document.getElementById('btn-add-distraction');
+    const hiddenDistractions = document.getElementById('custom-distractions');
+    let distractionTags = [];
+
+    function renderTags() {
+        if (!tagContainer) return;
+        tagContainer.innerHTML = '';
+        distractionTags.forEach((tag, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'tag-chip';
+            chip.innerHTML = `
+                <span>${tag}</span>
+                <button type="button" class="tag-chip-remove" aria-label="Remove" data-index="${index}">×</button>
+            `;
+            tagContainer.appendChild(chip);
+        });
+        if (hiddenDistractions) {
+            hiddenDistractions.value = distractionTags.join(', ');
+        }
+    }
+
+    function addTag() {
+        if (!tagInput) return;
+        const val = tagInput.value.trim().toLowerCase();
+        if (val && !distractionTags.includes(val)) {
+            distractionTags.push(val);
+            renderTags();
+        }
+        tagInput.value = '';
+        tagInput.focus();
+    }
+
+    if (tagInput && btnAddTag) {
+        btnAddTag.addEventListener('click', addTag);
+        tagInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addTag();
+            }
+        });
+        tagContainer.addEventListener('click', (e) => {
+            if (e.target.closest('.tag-chip-remove')) {
+                const index = e.target.closest('.tag-chip-remove').dataset.index;
+                distractionTags.splice(index, 1);
+                renderTags();
+            }
+        });
+        
+        // Init from existing value if any
+        if (hiddenDistractions && hiddenDistractions.value) {
+            distractionTags = hiddenDistractions.value.split(',').map(t => t.trim()).filter(t => t);
+            renderTags();
+        }
+    }
+
+    // --- Toggle Validation (Min 2 Features) ---
+    const startBtnEl = document.getElementById('btn-start-focus');
+    const validationMsg = document.getElementById('start-validation-msg');
+    let windowEnabled = true;
+
+    function validateToggles() {
+        if (!startBtnEl || !validationMsg) return;
+        const activeCount = [webcamEnabled, cursorEnabled, keyboardEnabled, windowEnabled].filter(Boolean).length;
+        if (activeCount < 2) {
+            startBtnEl.classList.add('disabled');
+            validationMsg.classList.remove('hidden');
+            return false;
+        } else {
+            startBtnEl.classList.remove('disabled');
+            validationMsg.classList.add('hidden');
+            return true;
+        }
+    }
+
     // --- Toggle Listeners ---
-    document.getElementById('toggle-webcam').addEventListener('change', (e) => { webcamEnabled = e.target.checked; });
-    document.getElementById('toggle-cursor').addEventListener('change', (e) => { cursorEnabled = e.target.checked; });
-    document.getElementById('toggle-keyboard').addEventListener('change', (e) => { keyboardEnabled = e.target.checked; });
+    document.getElementById('toggle-webcam').addEventListener('change', (e) => { webcamEnabled = e.target.checked; validateToggles(); });
+    document.getElementById('toggle-cursor').addEventListener('change', (e) => { cursorEnabled = e.target.checked; validateToggles(); });
+    document.getElementById('toggle-keyboard').addEventListener('change', (e) => { keyboardEnabled = e.target.checked; validateToggles(); });
+    const toggleWindow = document.getElementById('toggle-window');
+    if (toggleWindow) {
+        toggleWindow.addEventListener('change', (e) => { windowEnabled = e.target.checked; validateToggles(); });
+    }
+
+    // Run initial validation
+    validateToggles();
 
     // --- Floating Bar Toggle ---
     if (floatingBarToggle) {
@@ -212,13 +337,18 @@
     // --- Share Screen Button REMOVED in v2.4 (replaced by active window monitor) ---
 
     async function startSession() {
+        if (!validateToggles()) return; // Extra safety guard
+
         const taskName = document.getElementById('focus-task').value.trim() || 'Focus Session';
         headerTaskName.textContent = taskName;
 
         tracker.enabled.cursor = cursorEnabled;
         tracker.enabled.keyboard = keyboardEnabled;
+        tracker.enabled.window = windowEnabled; // NEW: pass window monitor state
+
         webcamFailed = false;
         isWatchingVideo = false;
+        window.isWatchingVideo = false; // ensure global
         videoPrompt.classList.add('hidden');
         distractionPrompt.classList.add('hidden');
         whitelistedApps = new Set();
@@ -335,8 +465,29 @@
                 if (drowsinessEpisodes > 0) drowsinessEpisodes = Math.max(0, drowsinessEpisodes - 0.05);
             }
 
-            const activityScore = isWatchingVideo ? 100 : tracker.getActivityScore();
-            session.updateFocusScore(data.smoothed_score || data.attention_score, activityScore);
+            const status = tracker.getStatus();
+            
+            // Build granular score object for session.js
+            const scores = {
+                webcam: data.smoothed_score || data.attention_score,
+                cursor: status.mouseActive ? 100 : Math.max(0, 100 - (status.mouseIdleSeconds * 2)),
+                keyboard: status.keyboardActive ? 100 : Math.max(0, 100 - (status.keyIdleSeconds * 2)),
+                window: 100 // Window score is handled implicitly by active app monitor, default 100 if no distraction
+            };
+            
+            // If watching video, forgive inactivity
+            if (isWatchingVideo) {
+                scores.cursor = 100;
+                scores.keyboard = 100;
+            }
+
+            // If distraction detected, tank the window score
+            const activeAppStatus = document.getElementById('active-app-status').textContent;
+            if (activeAppStatus.includes('Distraction')) {
+                scores.window = 0;
+            }
+
+            session.updateFocusScore(scores);
 
             // Update webcam stat
             const eyeScore = data.attention_score;
@@ -428,6 +579,7 @@
                         document.getElementById('distraction-app-name').textContent = `${lastDistractionApp} Detected`;
                         distractionPrompt.classList.remove('hidden');
                         dashboard.addLog(icon('warning') + ` Distraction detected: ${lastDistractionApp}`, 'warning');
+                        sendPushNotification('Distraction Detected', `You opened ${lastDistractionApp}. Please return to work!`);
                     }
                 } else {
                     statusEl.textContent = '✅ On Task';
@@ -466,8 +618,25 @@
             document.getElementById('stat-avg-value').textContent = `${avgScore ?? 0}%`;
 
             if (!webcamEnabled) {
-                const activityScore = isWatchingVideo ? 100 : tracker.getActivityScore();
-                session.updateFocusScore(null, activityScore);
+                // Fallback scoring when webcam is off
+                const scores = {
+                    webcam: null,
+                    cursor: status.mouseActive ? 100 : Math.max(0, 100 - (status.mouseIdleSeconds * 2)),
+                    keyboard: status.keyboardActive ? 100 : Math.max(0, 100 - (status.keyIdleSeconds * 2)),
+                    window: 100
+                };
+                
+                if (isWatchingVideo) {
+                    scores.cursor = 100;
+                    scores.keyboard = 100;
+                }
+                
+                const activeAppStatus = document.getElementById('active-app-status').textContent;
+                if (activeAppStatus.includes('Distraction')) {
+                    scores.window = 0;
+                }
+
+                session.updateFocusScore(scores);
                 // Update floating bar without webcam data
                 updateFloatingBar(null, status);
             }
@@ -593,9 +762,78 @@
         consecutiveLowCount = 0;
 
         document.getElementById('summary-duration').textContent = summary.durationFormatted;
-        document.getElementById('summary-focus').textContent = `${summary.avgFocus ?? 0}%`;
+        const avgFocus = summary.avgFocus ?? 0;
+        document.getElementById('summary-focus').textContent = `${avgFocus}%`;
         document.getElementById('summary-alerts').textContent = summary.notifications;
         document.getElementById('summary-quizzes').textContent = summary.quizzes;
+
+        // Populate Score Ring
+        const ringFill = document.getElementById('summary-ring-fill');
+        const scoreNumber = document.getElementById('summary-score-number');
+        if (ringFill && scoreNumber) {
+            scoreNumber.textContent = `${avgFocus}%`;
+            const circumference = 2 * Math.PI * 52; // r=52
+            const offset = circumference - (avgFocus / 100) * circumference;
+            
+            // Set initial state
+            ringFill.style.strokeDasharray = `${circumference} ${circumference}`;
+            ringFill.style.strokeDashoffset = circumference;
+            
+            // Trigger animation
+            setTimeout(() => {
+                ringFill.style.strokeDashoffset = offset;
+            }, 100);
+            
+            // Color based on score
+            if (avgFocus >= 70) ringFill.style.stroke = 'var(--success-color)';
+            else if (avgFocus >= 40) ringFill.style.stroke = 'var(--warning-color)';
+            else ringFill.style.stroke = 'var(--danger-color)';
+        }
+
+        // Populate Metrics Table
+        const tableBody = document.getElementById('metrics-table-body');
+        const totalScoreEl = document.getElementById('metrics-total-score');
+        if (tableBody && summary.metrics) {
+            tableBody.innerHTML = '';
+            
+            const rows = [
+                { name: 'Eye Contact', source: 'Webcam', data: summary.metrics.webcam },
+                { name: 'Mouse Activity', source: 'Cursor', data: summary.metrics.cursor },
+                { name: 'Keyboard Activity', source: 'Keyboard', data: summary.metrics.keyboard },
+                { name: 'Active Window', source: 'OS Monitor', data: summary.metrics.window }
+            ];
+
+            let rowHtml = '';
+            rows.forEach(r => {
+                if (r.data.active) {
+                    const weightPct = Math.round(r.data.weight * 100);
+                    const scoreDisplay = r.data.score !== null ? `${r.data.score}%` : 'N/A';
+                    
+                    rowHtml += `
+                        <tr>
+                            <td><strong>${r.name}</strong></td>
+                            <td style="color: var(--text-muted); font-size: 0.85rem;">${r.source}</td>
+                            <td>${weightPct}%</td>
+                            <td style="color: ${r.data.score >= 70 ? 'var(--success-color)' : r.data.score >= 40 ? 'var(--warning-color)' : 'var(--danger-color)'}; font-weight: 700;">
+                                ${scoreDisplay}
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    rowHtml += `
+                        <tr>
+                            <td><strong>${r.name}</strong></td>
+                            <td style="color: var(--text-muted); font-size: 0.85rem;">${r.source}</td>
+                            <td style="color: var(--text-muted);">Off</td>
+                            <td style="color: var(--text-muted);">—</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            tableBody.innerHTML = rowHtml;
+            if (totalScoreEl) totalScoreEl.innerHTML = `<strong>${avgFocus}%</strong>`;
+        }
 
         // Store summary for AI button
         lastSummary = summary;

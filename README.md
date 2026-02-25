@@ -1,8 +1,8 @@
-# 🎯 TrackerMode v2.5
+# 🎯 TrackerMode v2.4
 
-> **AI-powered focus tracking** with real-time eye tracking, active window monitoring, and AI session analysis.
+> **AI-powered focus tracking** with real-time eye tracking, active window title monitoring, and AI session analysis.
 
-TrackerMode monitors your focus during study or work sessions using your webcam (MediaPipe FaceLandmarker), keyboard/mouse activity, and active window detection. When your focus drops or you open a distraction app, it alerts you with visual warnings and audio alarms.
+TrackerMode monitors your focus during study or work sessions using your webcam (MediaPipe FaceLandmarker), keyboard/mouse activity, and active window **title** detection. It does **not** capture, record, or monitor your screen in any way — it only reads the window title text to detect distraction apps. When your focus drops or you open a distraction app, it alerts you with visual warnings and audio alarms.
 
 ---
 
@@ -18,8 +18,9 @@ TrackerMode is a **self-discipline tool**, not a surveillance app. You choose to
 
 **What we DON'T do:**
 
-- ❌ **No screenshots** — we never capture your screen
-- ❌ **No screen recording** — we only read the window title (plain text)
+- ❌ **No screen monitoring** — we do NOT capture, record, or view your screen at all
+- ❌ **No screenshots** — we never take screenshots or screen recordings
+- ❌ **No screen content reading** — we only read the window **title bar text** (e.g. "Google Chrome"), never your screen content
 - ❌ **No data sent externally** — all processing is local on your machine
 - ❌ **No browsing history** — we don't track URLs or web content
 - ❌ **No keystroke logging** — we only detect *if* you're typing, not *what*
@@ -130,33 +131,6 @@ TrackerMode/
 
 ---
 
-## 🚀 Quick Start
-
-### 1. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Set Up Environment
-
-```bash
-# Create .env file
-echo OPENAI_API_KEY=your-api-key-here > .env
-```
-
-> AI analysis is optional. The app works without an API key.
-
-### 3. Run
-
-```bash
-python server.py
-```
-
-Open **http://localhost:8000** in Chrome.
-
----
-
 ## 🔧 Tech Stack
 
 | Component        | Technology                           |
@@ -166,7 +140,7 @@ Open **http://localhost:8000** in Chrome.
 | Fallback         | Haar Cascades (OpenCV)               |
 | Window Monitor   | pygetwindow (OS-level window title)  |
 | Input Tracking   | pynput (system-wide mouse/keyboard)  |
-| AI Analysis      | OpenAI GPT-4o-mini                   |
+| AI Analysis      | OpenAI                   |
 | Frontend         | Vanilla HTML/CSS/JS                  |
 | Communication    | WebSocket (real-time frames)         |
 | PiP Window       | window.open() popup                  |

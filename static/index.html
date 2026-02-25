@@ -19,70 +19,199 @@
 <body>
     <!-- ===== SPLASH / START SCREEN ===== -->
     <div id="splash-screen" class="screen active">
+        <div class="hero-grid"></div>
+        <div class="hero-glow-2"></div>
         <div class="splash-container">
             <div class="splash-glow"></div>
-            <div class="splash-icon">
-                <img src="/static/icon/logo.svg" alt="TrackerMode" width="80" height="60"
-                    style="object-fit: contain; filter: drop-shadow(0 0 20px rgba(108, 92, 231, 0.4));">
+
+            <!-- Header (compact) -->
+            <div class="splash-header">
+                <div class="splash-header-row">
+                    <img src="/static/icon/logo.svg" alt="TrackerMode" width="44" height="32"
+                        style="object-fit: contain; filter: drop-shadow(0 0 12px rgba(108, 92, 231, 0.4));">
+                    <h1 class="splash-title">Tracker<span class="gradient-text">Mode</span></h1>
+                    <span class="version-badge">v2.5</span>
+                </div>
+                <p class="splash-subtitle">AI-Powered Focus Tracker</p>
             </div>
-            <h1 class="splash-title">Tracker<span class="gradient-text">Mode</span></h1>
-            <p class="splash-subtitle">AI-Powered Focus Tracker <span class="version-badge">v2.2</span></p>
 
-            <div class="setup-card">
-                <div class="setup-field">
-                    <label for="focus-duration">Focus Duration</label>
-                    <div class="duration-selector">
-                        <button class="duration-btn" data-minutes="15">15m</button>
-                        <button class="duration-btn active" data-minutes="25">25m</button>
-                        <button class="duration-btn" data-minutes="45">45m</button>
-                        <button class="duration-btn" data-minutes="60">60m</button>
-                        <button class="duration-btn" data-minutes="90">90m</button>
+            <!-- Two-Column Setup Grid -->
+            <div class="setup-grid">
+
+                <!-- LEFT: Session Setup -->
+                <div class="setup-column">
+                    <div class="setup-card">
+                        <h2 class="setup-card-title">Session Setup</h2>
+
+                        <div class="setup-field">
+                            <label for="focus-task">What are you focusing on?</label>
+                            <input type="text" id="focus-task" placeholder="e.g. Coursera Machine Learning..."
+                                autocomplete="off">
+                        </div>
+
+                        <div class="setup-field">
+                            <label for="focus-duration">Focus Duration</label>
+                            <div class="duration-selector">
+                                <button class="duration-btn" data-minutes="15">15m</button>
+                                <button class="duration-btn active" data-minutes="25">25m</button>
+                                <button class="duration-btn" data-minutes="45">45m</button>
+                                <button class="duration-btn" data-minutes="60">60m</button>
+                                <button class="duration-btn" data-minutes="90">90m</button>
+                            </div>
+                            <div class="custom-duration-row">
+                                <span class="custom-duration-label">or custom:</span>
+                                <input type="number" id="custom-duration" class="custom-duration-input" min="1"
+                                    max="240" placeholder="min">
+                                <span class="custom-duration-unit">minutes</span>
+                            </div>
+                        </div>
+
+                        <div class="setup-field">
+                            <label>Distraction Apps</label>
+                            <div class="tag-input-container">
+                                <div class="tag-list" id="distraction-tags"></div>
+                                <div class="tag-input-row">
+                                    <input type="text" id="distraction-input" class="tag-input"
+                                        placeholder="Type app name..." autocomplete="off">
+                                    <button type="button" id="btn-add-distraction" class="btn-add-tag">+ Add</button>
+                                </div>
+                            </div>
+                            <!-- Hidden field for backend compatibility -->
+                            <input type="hidden" id="custom-distractions">
+                            <p class="setup-field-hint">Only reads window <strong>title text</strong> — no screenshots.
+                            </p>
+                        </div>
+
+                        <button id="btn-start-focus" class="btn-primary btn-glow">
+                            <div class="feature-card-icon">
+                                <img src="/static/icon/join_rocket.svg" alt="Eye" width="18" height="18">
+                            </div>
+                            Start Focus Session
+                        </button>
+                        <p class="start-validation-msg hidden" id="start-validation-msg">
+                            ⚠️ Enable at least <strong>2 tracking features</strong> to start.
+                        </p>
                     </div>
                 </div>
 
-                <div class="setup-field">
-                    <label for="focus-task">What are you focusing on?</label>
-                    <input type="text" id="focus-task" placeholder="e.g. Coursera Machine Learning..."
-                        autocomplete="off">
+                <!-- RIGHT: Feature Configuration -->
+                <div class="setup-column">
+                    <div class="setup-card">
+                        <h2 class="setup-card-title">Tracking Features</h2>
+
+                        <!-- Webcam Eye Tracking -->
+                        <div class="feature-card" data-expandable>
+                            <div class="feature-card-header">
+                                <div class="feature-card-icon">
+                                    <img src="/static/icon/eye.svg" alt="Eye" width="18" height="18">
+                                </div>
+                                <div class="feature-card-title">Webcam Eye Tracking</div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-webcam" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <button class="feature-expand-btn" aria-label="Expand">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="feature-card-body">
+                                <p class="feature-card-desc">Analyzes <strong>478 facial landmarks</strong> — eye
+                                    contact, gaze direction, head pose, blink rate, drowsiness.</p>
+                                <div class="feature-card-badge privacy-badge">
+                                    <span class="badge-icon">🔒</span>
+                                    <span>Video is <strong>never recorded</strong>. Only landmarks analyzed
+                                        locally.</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cursor Monitoring -->
+                        <div class="feature-card" data-expandable>
+                            <div class="feature-card-header">
+                                <div class="feature-card-icon">
+                                    <img src="/static/icon/mouse.svg" alt="Cursor" width="18" height="18">
+                                </div>
+                                <div class="feature-card-title">Cursor Monitoring</div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-cursor" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <button class="feature-expand-btn" aria-label="Expand">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="feature-card-body">
+                                <p class="feature-card-desc">Detects mouse movement. Idle <strong>30+ seconds</strong>
+                                    lowers focus score.</p>
+                            </div>
+                        </div>
+
+                        <!-- Keyboard Activity -->
+                        <div class="feature-card" data-expandable>
+                            <div class="feature-card-header">
+                                <div class="feature-card-icon">
+                                    <img src="/static/icon/keyboard.svg" alt="Keyboard" width="18" height="18">
+                                </div>
+                                <div class="feature-card-title">Keyboard Activity</div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-keyboard" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <button class="feature-expand-btn" aria-label="Expand">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="feature-card-body">
+                                <p class="feature-card-desc">Idle <strong>60+ seconds</strong> signals low focus.</p>
+                                <div class="feature-card-badge privacy-badge">
+                                    <span class="badge-icon">🔒</span>
+                                    <span>Detects <strong>if</strong> you type — never <strong>what</strong>.</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Window Monitor -->
+                        <div class="feature-card" data-expandable>
+                            <div class="feature-card-header">
+                                <div class="feature-card-icon">
+                                    <img src="/static/icon/screen.svg" alt="Screen" width="18" height="18">
+                                </div>
+                                <div class="feature-card-title">Window Monitor</div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-window" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <button class="feature-expand-btn" aria-label="Expand">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="feature-card-body">
+                                <p class="feature-card-desc">Flags distractions (WhatsApp, TikTok, etc.) and asks:
+                                    <em>"Is this for studying?"</em>
+                                </p>
+                                <div class="feature-card-badge privacy-badge">
+                                    <span class="badge-icon">🔒</span>
+                                    <span>Reads <strong>title bar text</strong> only. <strong>No screen
+                                            capture.</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
 
-                <div class="setup-toggles">
-                    <div class="toggle-item">
-                        <img src="/static/icon/eye.svg" class="toggle-icon" alt="Eye">
-                        <span class="toggle-label">Webcam Eye Tracking</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-webcam" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-item">
-                        <img src="/static/icon/screen.svg" class="toggle-icon" alt="Screen">
-                        <span class="toggle-label">Custom Distractions</span>
-                        <input type="text" id="custom-distractions" class="input-distractions"
-                            placeholder="e.g. youtube, reddit" title="Comma-separated app names to block">
-                    </div>
-                    <div class="toggle-item">
-                        <img src="/static/icon/mouse.svg" class="toggle-icon" alt="Mouse">
-                        <span class="toggle-label">Cursor Monitoring</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-cursor" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-item">
-                        <img src="/static/icon/keyboard.svg" class="toggle-icon" alt="Keyboard">
-                        <span class="toggle-label">Keyboard Activity</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-keyboard" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <button id="btn-start-focus" class="btn-primary btn-glow">
-                    <span class="btn-icon">🎯</span>
-                    Start Focus Session
-                </button>
             </div>
         </div>
     </div>
@@ -399,8 +528,22 @@
     <!-- ===== SUMMARY SCREEN ===== -->
     <div id="summary-screen" class="screen">
         <div class="summary-container">
-            <div class="summary-icon">🎉</div>
+            <div class="hero-grid"></div>
+            <div class="hero-glow-2"></div>
+
+            <!-- Score Ring -->
+            <div class="summary-score-ring">
+                <svg class="score-ring-svg" viewBox="0 0 120 120">
+                    <circle class="score-ring-bg" cx="60" cy="60" r="52" />
+                    <circle class="score-ring-fill-summary" id="summary-ring-fill" cx="60" cy="60" r="52" />
+                </svg>
+                <div class="summary-score-value" id="summary-score-number">--</div>
+                <div class="summary-score-label">FOCUS</div>
+            </div>
+
             <h1>Session Complete!</h1>
+
+            <!-- Quick Stats Row -->
             <div class="summary-stats">
                 <div class="summary-stat">
                     <span class="summary-stat-value" id="summary-duration">00:00</span>
@@ -418,6 +561,31 @@
                     <span class="summary-stat-value" id="summary-quizzes">0</span>
                     <span class="summary-stat-label">Quizzes</span>
                 </div>
+            </div>
+
+            <!-- Metrics Calculation Table -->
+            <div class="metrics-table-section">
+                <h2 class="metrics-table-title">Score Breakdown</h2>
+                <table class="metrics-table" id="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Source</th>
+                            <th>Weight</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="metrics-table-body">
+                        <!-- Populated by JS -->
+                    </tbody>
+                    <tfoot>
+                        <tr class="metrics-total-row">
+                            <td colspan="2"><strong>Final Focus Score</strong></td>
+                            <td>—</td>
+                            <td id="metrics-total-score"><strong>--%</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
 
             <!-- AI Analysis Section -->
