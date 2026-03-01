@@ -1,4 +1,6 @@
-# 🎯 TrackerMode v2.4
+# 🎯 TrackerMode v2.4 (Legacy)
+
+> **Notice: For the latest v2.5 Desktop Application, please navigate to the `TrackerModeDesktop` directory instead!**
 
 > **AI-powered focus tracking** with real-time eye tracking, active window title monitoring, and AI session analysis.
 
@@ -87,6 +89,8 @@ TrackerMode is a **self-discipline tool**, not a surveillance app. You choose to
 
 ```
 TrackerMode/
+├── TrackerModeDesktop/    # ⭐️ Version 2.5 Native Desktop App with PyInstaller
+├── TrackerMode/           # Legacy v2.4 web-based server
 ├── server.py              # FastAPI backend + MediaPipe + WebSocket + pygetwindow
 ├── main.py                # Standalone Python tracker (v1.0, Haar Cascades + dlib)
 ├── requirements.txt       # Python dependencies

@@ -1,9 +1,8 @@
 /**
- * TrackerMode v2.4 — Main Entry Point
+ * TrackerMode v2.5 — Main Entry Point
  * Wires together: Session, ActivityTracker, WebcamManager, Quiz, Dashboard
- * v2.4: Replaced screen capture with active window monitoring + distraction detection
+ * v2.5: Modular backend, app time breakdown, light theme toggle
  */
-
 (function() {
     // --- Icon Paths ---
     const ICONS = {
@@ -29,6 +28,17 @@
     const quiz = new QuizSystem();
     const dashboard = new Dashboard();
     const pip = new PipMetrics();
+
+    // --- Theme Toggle ---
+    const savedTheme = localStorage.getItem('trackermode-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme') || 'dark';
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('trackermode-theme', next);
+    });
 
     // --- State ---
     let selectedDuration = 25;
@@ -93,6 +103,15 @@
     let lastDrowsinessTime = 0;       // Cooldown for drowsy notifications
     const DROWSY_COOLDOWN_MS = 60000; // 60s between drowsy warnings
     const DROWSY_TOLERANCE = 3;       // Allow 3 episodes before first warning
+
+    // --- Distraction Sound System ---
+    const distractionSound = new Audio('/static/audio/notifications2.mp3');
+    const alertSound = new Audio('/static/audio/notifications1.mp3');
+    distractionSound.volume = 0.6;
+    alertSound.volume = 0.8;
+    let distractionIgnoreCount = {};    // Track how many times user ignored distraction per app
+    let lastDistractionSoundTime = 0;  // Cooldown for distraction sound
+    const DISTRACTION_SOUND_COOLDOWN = 15000; // 15s between distraction sounds
 
     // --- Active App Monitor ---
     const distractionPrompt = document.getElementById('distraction-prompt');
@@ -342,6 +361,13 @@
         const taskName = document.getElementById('focus-task').value.trim() || 'Focus Session';
         headerTaskName.textContent = taskName;
 
+        // Show motivation modal if distraction apps are set
+        const tagList = document.querySelector('.tag-list');
+        const distractionTags = tagList ? Array.from(tagList.querySelectorAll('.tag-chip')).map(t => t.textContent.replace('×', '').trim()) : [];
+        if (distractionTags.length > 0) {
+            await showMotivationModal(taskName, distractionTags);
+        }
+
         tracker.enabled.cursor = cursorEnabled;
         tracker.enabled.keyboard = keyboardEnabled;
         tracker.enabled.window = windowEnabled; // NEW: pass window monitor state
@@ -353,6 +379,8 @@
         distractionPrompt.classList.add('hidden');
         whitelistedApps = new Set();
         lastDistractionApp = '';
+        distractionIgnoreCount = {};
+        lastDistractionSoundTime = 0;
         lastAlertTime = 0;
         consecutiveLowCount = 0;
         drowsinessEpisodes = 0;
@@ -542,7 +570,7 @@
                 let displayIcon = '🖥️';
 
                 // Smart app detection for beautiful icons
-                if (lowerTitle.includes('youtube')) { displayApp = 'YouTube'; displayIcon = '▶️'; }
+                if (lowerTitle.includes('youtube','YouTube')) { displayApp = 'YouTube'; displayIcon = '▶️'; }
                 else if (lowerTitle.includes('whatsapp')) { displayApp = 'WhatsApp'; displayIcon = '💬'; }
                 else if (lowerTitle.includes('visual studio code') || lowerTitle.includes('vscode') || lowerTitle.includes('cursor')) { displayApp = 'VS Code'; displayIcon = '💻'; }
                 else if (lowerTitle.includes('discord')) { displayApp = 'Discord'; displayIcon = '🎮'; }
@@ -572,14 +600,33 @@
                     statusEl.className = 'app-monitor-status distraction';
                     if (bgEl) bgEl.className = 'app-monitor-bg distraction';
                     
-                    // Show distraction prompt (first time per app per session)
                     const appKey = (win.matched_keyword || displayApp).toLowerCase();
-                    if (!whitelistedApps.has(appKey) && distractionPrompt.classList.contains('hidden')) {
-                        lastDistractionApp = displayApp;
-                        document.getElementById('distraction-app-name').textContent = `${lastDistractionApp} Detected`;
-                        distractionPrompt.classList.remove('hidden');
-                        dashboard.addLog(icon('warning') + ` Distraction detected: ${lastDistractionApp}`, 'warning');
-                        sendPushNotification('Distraction Detected', `You opened ${lastDistractionApp}. Please return to work!`);
+                    const now = Date.now();
+                    
+                    // Step 1: Play soft notification sound first
+                    if (now - lastDistractionSoundTime > DISTRACTION_SOUND_COOLDOWN) {
+                        lastDistractionSoundTime = now;
+                        distractionIgnoreCount[appKey] = (distractionIgnoreCount[appKey] || 0) + 1;
+                        
+                        if (distractionIgnoreCount[appKey] <= 2) {
+                            // First 2 times: soft warning with notifications2
+                            distractionSound.currentTime = 0;
+                            distractionSound.play().catch(() => {});
+                            showNotification('Distraction Warning', `${displayApp} detected — close it and stay focused!`, 'warning');
+                            dashboard.addLog(icon('warning') + ` Distraction detected: ${displayApp}`, 'warning');
+                            sendPushNotification('Distraction Detected', `You opened ${displayApp}. Please return to work!`);
+                        } else {
+                            // Step 2: Escalate — loud alert with notifications1 + show prompt
+                            alertSound.currentTime = 0;
+                            alertSound.play().catch(() => {});
+                            lastDistractionApp = displayApp;
+                            document.getElementById('distraction-app-name').textContent = `${lastDistractionApp} Detected`;
+                            distractionPrompt.classList.remove('hidden');
+                            showNotification('⚠️ You broke your promise!', `${displayApp} is still open! You promised to stay disciplined.`, 'danger');
+                            dashboard.addLog(icon('alert') + ` ALERT: ${displayApp} still open — ignored warnings!`, 'danger');
+                            sendPushNotification('Focus Broken!', `${displayApp} is still open after multiple warnings!`);
+                            distractionIgnoreCount[appKey] = 0; // Reset after escalation
+                        }
                     }
                 } else {
                     statusEl.textContent = '✅ On Task';
@@ -767,6 +814,10 @@
         document.getElementById('summary-alerts').textContent = summary.notifications;
         document.getElementById('summary-quizzes').textContent = summary.quizzes;
 
+        // Set task name in summary header
+        const taskNameEl = document.getElementById('summary-task-name');
+        if (taskNameEl) taskNameEl.textContent = summary.taskName || 'Focus Session';
+
         // Populate Score Ring
         const ringFill = document.getElementById('summary-ring-fill');
         const scoreNumber = document.getElementById('summary-score-number');
@@ -851,7 +902,7 @@
             let appHtml = '';
             const topApps = summary.windowTimeData.slice(0, 10);  // Show top 10
             topApps.forEach((item, idx) => {
-                const barColor = idx === 0 ? 'var(--primary-color)' : idx < 3 ? 'var(--accent-color)' : 'var(--text-muted)';
+                const barColor = idx === 0 ? 'var(--accent-primary)' : idx < 3 ? 'var(--accent-secondary)' : 'var(--text-muted)';
                 appHtml += `
                     <tr>
                         <td><strong>${item.app}</strong></td>
@@ -1019,6 +1070,33 @@
         if (!el) return;
         el.className = 'stat-indicator';
         if (state) el.classList.add(state);
+    }
+
+    function showMotivationModal(taskName, distractionTags) {
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.className = 'motivation-modal-overlay';
+            overlay.innerHTML = `
+                <div class="motivation-modal">
+                    <div class="motivation-modal-icon">🎯</div>
+                    <h2>Stay Disciplined!</h2>
+                    <p>You're about to focus on <strong>"${taskName}"</strong>. You promised to avoid these apps:</p>
+                    <div class="motivation-apps-list">
+                        ${distractionTags.map(tag => `<span class="motivation-app-tag">${tag}</span>`).join('')}
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--text-muted);">If you open them, TrackerMode will remind you to stay on track.</p>
+                    <button class="btn-primary btn-glow" id="btn-motivation-go">
+                        <span class="btn-icon"></span>
+                        I Promise — Let's Go!
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#btn-motivation-go').addEventListener('click', () => {
+                overlay.remove();
+                resolve();
+            });
+        });
     }
 
     function showNotification(title, message, type = 'warning') {

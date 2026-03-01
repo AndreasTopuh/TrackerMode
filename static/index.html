@@ -31,6 +31,10 @@
                         style="object-fit: contain; filter: drop-shadow(0 0 12px rgba(108, 92, 231, 0.4));">
                     <h1 class="splash-title">Tracker<span class="gradient-text">Mode</span></h1>
                     <span class="version-badge">v2.5</span>
+                    <button id="btn-theme-toggle" class="btn-theme-toggle" title="Toggle Light/Dark Theme">
+                        <span class="theme-icon-dark">🌙</span>
+                        <span class="theme-icon-light">☀️</span>
+                    </button>
                 </div>
                 <p class="splash-subtitle">AI-Powered Focus Tracker</p>
             </div>
@@ -527,106 +531,132 @@
 
     <!-- ===== SUMMARY SCREEN ===== -->
     <div id="summary-screen" class="screen">
-        <div class="summary-container">
+        <div class="summary-dashboard">
             <div class="hero-grid"></div>
             <div class="hero-glow-2"></div>
 
-            <!-- Score Ring -->
-            <div class="summary-score-ring">
-                <svg class="score-ring-svg" viewBox="0 0 120 120">
-                    <circle class="score-ring-bg" cx="60" cy="60" r="52" />
-                    <circle class="score-ring-fill-summary" id="summary-ring-fill" cx="60" cy="60" r="52" />
-                </svg>
-                <div class="summary-score-value" id="summary-score-number">--</div>
-                <div class="summary-score-label">FOCUS</div>
-            </div>
-
-            <h1>Session Complete!</h1>
-
-            <!-- Quick Stats Row -->
-            <div class="summary-stats">
-                <div class="summary-stat">
-                    <span class="summary-stat-value" id="summary-duration">00:00</span>
-                    <span class="summary-stat-label">Duration</span>
+            <!-- Top Header Bar -->
+            <header class="summary-header">
+                <div class="summary-header-left">
+                    <div class="summary-ring-mini">
+                        <svg class="score-ring-svg" viewBox="0 0 120 120">
+                            <circle class="score-ring-bg" cx="60" cy="60" r="52" />
+                            <circle class="score-ring-fill-summary" id="summary-ring-fill" cx="60" cy="60" r="52" />
+                        </svg>
+                        <div class="summary-ring-number" id="summary-score-number">--</div>
+                    </div>
+                    <div class="summary-header-info">
+                        <h1 class="summary-title">Session Complete!</h1>
+                        <span class="summary-subtitle" id="summary-task-name">Focus Session</span>
+                    </div>
                 </div>
-                <div class="summary-stat">
-                    <span class="summary-stat-value" id="summary-focus">--%</span>
-                    <span class="summary-stat-label">Avg Focus</span>
-                </div>
-                <div class="summary-stat">
-                    <span class="summary-stat-value" id="summary-alerts">0</span>
-                    <span class="summary-stat-label">Alerts</span>
-                </div>
-                <div class="summary-stat">
-                    <span class="summary-stat-value" id="summary-quizzes">0</span>
-                    <span class="summary-stat-label">Quizzes</span>
-                </div>
-            </div>
-
-            <!-- Metrics Calculation Table -->
-            <div class="metrics-table-section">
-                <h2 class="metrics-table-title">Score Breakdown</h2>
-                <table class="metrics-table" id="metrics-table">
-                    <thead>
-                        <tr>
-                            <th>Metric</th>
-                            <th>Source</th>
-                            <th>Weight</th>
-                            <th>Score</th>
-                        </tr>
-                    </thead>
-                    <tbody id="metrics-table-body">
-                        <!-- Populated by JS -->
-                    </tbody>
-                    <tfoot>
-                        <tr class="metrics-total-row">
-                            <td colspan="2"><strong>Final Focus Score</strong></td>
-                            <td>—</td>
-                            <td id="metrics-total-score"><strong>--%</strong></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-
-            <!-- App Time Breakdown -->
-            <div class="metrics-table-section" id="app-time-section" style="display:none;">
-                <h2 class="metrics-table-title">App Time Breakdown</h2>
-                <p class="app-time-desc">Time spent on each application during this session</p>
-                <table class="metrics-table app-time-table" id="app-time-table">
-                    <thead>
-                        <tr>
-                            <th>Application</th>
-                            <th>Duration</th>
-                            <th>Usage</th>
-                            <th>%</th>
-                        </tr>
-                    </thead>
-                    <tbody id="app-time-body">
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- AI Analysis Section -->
-            <div class="ai-analysis-section" id="ai-analysis-section">
-                <h2 class="ai-analysis-title">AI Coach Analysis</h2>
-                <div class="ai-analysis-idle" id="ai-idle">
-                    <p>Want to analyze this session with AI? (uses API credits)</p>
-                    <button id="btn-ai-analyze" class="btn-ai-analyze">
-                        Analyze with AI
+                <div class="summary-header-right">
+                    <button id="btn-restart" class="btn-primary btn-glow btn-restart-compact">
+                        <span class="btn-icon"></span>
+                        New Session
                     </button>
                 </div>
-                <div class="ai-analysis-loading" id="ai-loading" style="display:none;">
-                    <div class="ai-spinner"></div>
-                    <p>Analyzing your session with AI...</p>
+            </header>
+
+            <!-- Quick Stats Row -->
+            <div class="summary-stats-row">
+                <div class="summary-stat-card">
+                    <div class="summary-stat-icon">
+                        <img src="/static/icon/eye.svg" alt="Duration" width="18" height="18">
+                    </div>
+                    <div class="summary-stat-data">
+                        <span class="summary-stat-value" id="summary-duration">00:00</span>
+                        <span class="summary-stat-label">Duration</span>
+                    </div>
                 </div>
-                <div class="ai-analysis-result" id="ai-result" style="display:none;"></div>
+                <div class="summary-stat-card">
+                    <div class="summary-stat-icon">
+                        <img src="/static/icon/bar_avg.svg" alt="Focus" width="18" height="18">
+                    </div>
+                    <div class="summary-stat-data">
+                        <span class="summary-stat-value" id="summary-focus">--%</span>
+                        <span class="summary-stat-label">Avg Focus</span>
+                    </div>
+                </div>
+                <div class="summary-stat-card">
+                    <div class="summary-stat-icon">
+                        <img src="/static/icon/warning.svg" alt="Alerts" width="18" height="18">
+                    </div>
+                    <div class="summary-stat-data">
+                        <span class="summary-stat-value" id="summary-alerts">0</span>
+                        <span class="summary-stat-label">Alerts</span>
+                    </div>
+                </div>
+                <div class="summary-stat-card">
+                    <div class="summary-stat-icon">⚡</div>
+                    <div class="summary-stat-data">
+                        <span class="summary-stat-value" id="summary-quizzes">0</span>
+                        <span class="summary-stat-label">Quizzes</span>
+                    </div>
+                </div>
             </div>
 
-            <button id="btn-restart" class="btn-primary btn-glow">
-                <span class="btn-icon">🔄</span>
-                Start New Session
-            </button>
+            <!-- Two-Column Body -->
+            <div class="summary-body">
+                <!-- LEFT: Score Breakdown -->
+                <div class="summary-panel">
+                    <h2 class="summary-panel-title">Score Breakdown</h2>
+                    <table class="metrics-table" id="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Source</th>
+                                <th>Weight</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metrics-table-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                        <tfoot>
+                            <tr class="metrics-total-row">
+                                <td colspan="2"><strong>Final Focus Score</strong></td>
+                                <td>—</td>
+                                <td id="metrics-total-score"><strong>--%</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <!-- AI Analysis (compact) -->
+                    <div class="ai-analysis-compact" id="ai-analysis-section">
+                        <div class="ai-analysis-idle" id="ai-idle">
+                            <button id="btn-ai-analyze" class="btn-ai-analyze">
+                                Analyze with AI
+                            </button>
+                        </div>
+                        <div class="ai-analysis-loading" id="ai-loading" style="display:none;">
+                            <div class="ai-spinner"></div>
+                            <p>Analyzing...</p>
+                        </div>
+                        <div class="ai-analysis-result" id="ai-result" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: App Time Breakdown -->
+                <div class="summary-panel" id="app-time-section" style="display:none;">
+                    <h2 class="summary-panel-title">App Time Breakdown</h2>
+                    <div class="app-time-scroll">
+                        <table class="metrics-table app-time-table" id="app-time-table">
+                            <thead>
+                                <tr>
+                                    <th>Application</th>
+                                    <th>Duration</th>
+                                    <th>Usage</th>
+                                    <th>%</th>
+                                </tr>
+                            </thead>
+                            <tbody id="app-time-body">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
