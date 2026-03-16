@@ -1,6 +1,7 @@
 /**
- * TrackerMode v2 — Dashboard Renderer
+ * TrackerMode v2.6 — Dashboard Renderer
  * Renders focus timeline chart and activity log.
+ * Supports light/dark theme via CSS custom properties.
  */
 
 class Dashboard {
@@ -69,8 +70,9 @@ class Dashboard {
         const points = this.dataPoints;
         const stepX = w / (this.maxPoints - 1);
 
-        // Draw grid lines
-        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        // Draw grid lines — adapt to current theme
+        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.08)';
         ctx.lineWidth = 1;
         for (let i = 0; i <= 4; i++) {
             const y = (h / 4) * i;

@@ -1,6 +1,12 @@
 /**
- * TrackerMode v2.2 — Activity Tracker
+ * TrackerMode v2.6 — Activity Tracker
  * Hybrid: uses pynput backend (global) if available, falls back to browser events.
+ * 
+ * Browser-only mode includes:
+ * - Page Visibility API (detect tab switch = distraction)
+ * - Window blur/focus (detect leaving browser)
+ * - In-page mouse/keyboard (interaction with study material)
+ * - Tab switch counter + cumulative away time
  */
 
 class ActivityTracker {
@@ -14,7 +20,7 @@ class ActivityTracker {
         this.isMouseActive = true;
         this.isKeyboardActive = true;
 
-        this.enabled = { cursor: true, keyboard: true };
+        this.enabled = { cursor: true, keyboard: true, window: true };
         this.listeners = [];
 
         // Global tracking mode
@@ -22,12 +28,29 @@ class ActivityTracker {
         this.paused = false;
         this._pollInterval = null;
 
+        // --- Browser-only: Tab Visibility & Focus ---
+        this.tabVisible = true;           // is our tab the active one?
+        this.windowFocused = true;        // is the browser window focused?
+        this.tabSwitchCount = 0;          // how many times user left the tab
+        this.totalAwayMs = 0;             // cumulative ms spent away from tab
+        this._awayStart = null;           // timestamp when user left
+
         this._onMouseMove = this._onMouseMove.bind(this);
         this._onKeyDown = this._onKeyDown.bind(this);
         this._onMouseClick = this._onMouseClick.bind(this);
+        this._onVisibilityChange = this._onVisibilityChange.bind(this);
+        this._onWindowBlur = this._onWindowBlur.bind(this);
+        this._onWindowFocus = this._onWindowFocus.bind(this);
     }
 
     async start() {
+        // Reset tab stats
+        this.tabSwitchCount = 0;
+        this.totalAwayMs = 0;
+        this._awayStart = null;
+        this.tabVisible = !document.hidden;
+        this.windowFocused = document.hasFocus();
+
         // Try to use global backend first
         try {
             const resp = await fetch('/api/input-status');
@@ -45,9 +68,17 @@ class ActivityTracker {
         // Fallback to browser-only tracking
         console.log('[Tracker] Fallback: browser-only input tracking');
         this.useGlobal = false;
+
+        // Page interaction events
         document.addEventListener('mousemove', this._onMouseMove);
         document.addEventListener('keydown', this._onKeyDown);
         document.addEventListener('click', this._onMouseClick);
+
+        // Tab visibility + window focus (the KEY web metrics)
+        document.addEventListener('visibilitychange', this._onVisibilityChange);
+        window.addEventListener('blur', this._onWindowBlur);
+        window.addEventListener('focus', this._onWindowFocus);
+
         this._checkInterval = setInterval(() => this._checkActivity(), 2000);
     }
 
@@ -85,6 +116,9 @@ class ActivityTracker {
                 document.addEventListener('mousemove', this._onMouseMove);
                 document.addEventListener('keydown', this._onKeyDown);
                 document.addEventListener('click', this._onMouseClick);
+                document.addEventListener('visibilitychange', this._onVisibilityChange);
+                window.addEventListener('blur', this._onWindowBlur);
+                window.addEventListener('focus', this._onWindowFocus);
                 this._checkInterval = setInterval(() => this._checkActivity(), 2000);
             }
         }, 2000);
@@ -94,6 +128,15 @@ class ActivityTracker {
         document.removeEventListener('mousemove', this._onMouseMove);
         document.removeEventListener('keydown', this._onKeyDown);
         document.removeEventListener('click', this._onMouseClick);
+        document.removeEventListener('visibilitychange', this._onVisibilityChange);
+        window.removeEventListener('blur', this._onWindowBlur);
+        window.removeEventListener('focus', this._onWindowFocus);
+
+        // Flush remaining away time
+        if (this._awayStart) {
+            this.totalAwayMs += Date.now() - this._awayStart;
+            this._awayStart = null;
+        }
 
         if (this._checkInterval) {
             clearInterval(this._checkInterval);
@@ -120,7 +163,7 @@ class ActivityTracker {
         const mouseIdle = now - this.mouseLastMoved;
         const keyIdle = now - this.keyLastPressed;
 
-        return {
+        const base = {
             mouseActive: this.enabled.cursor ? mouseIdle < this.mouseIdleThreshold : null,
             keyboardActive: this.enabled.keyboard ? keyIdle < this.keyIdleThreshold : null,
             mouseIdleSeconds: Math.floor(mouseIdle / 1000),
@@ -129,6 +172,40 @@ class ActivityTracker {
             keystrokes: this.keystrokes,
             activeWindow: this.activeWindow
         };
+
+        // Add browser-specific tab focus data (always available, but most useful in browser mode)
+        if (!this.useGlobal) {
+            base.tabVisible = this.tabVisible;
+            base.windowFocused = this.windowFocused;
+            base.tabSwitchCount = this.tabSwitchCount;
+            base.totalAwaySeconds = Math.floor((this.totalAwayMs + (this._awayStart ? (now - this._awayStart) : 0)) / 1000);
+            base.isOnTab = this.tabVisible && this.windowFocused;
+        }
+
+        return base;
+    }
+
+    /**
+     * Returns a "Tab Focus" score (0-100) for browser mode.
+     * Measures how much the user stays on this tab vs switching away.
+     */
+    getTabFocusScore() {
+        if (this.useGlobal) return null; // not applicable in global mode
+
+        // Currently on tab = high base
+        if (this.tabVisible && this.windowFocused) {
+            // Penalize based on number of tab switches (max -40)
+            const switchPenalty = Math.min(40, this.tabSwitchCount * 8);
+            return Math.max(30, 100 - switchPenalty);
+        }
+
+        // Tab visible but window not focused (e.g. reading alongside)
+        if (this.tabVisible && !this.windowFocused) {
+            return 40;
+        }
+
+        // Tab hidden = user definitely switched away
+        return 0;
     }
 
     /**
@@ -159,6 +236,8 @@ class ActivityTracker {
         return Math.max(0, Math.min(100, score));
     }
 
+    // --- Browser event handlers ---
+
     _onMouseMove(e) {
         this.mouseLastMoved = Date.now();
         this.mouseMovements++;
@@ -174,6 +253,42 @@ class ActivityTracker {
         this.keystrokes++;
     }
 
+    _onVisibilityChange() {
+        const wasVisible = this.tabVisible;
+        this.tabVisible = !document.hidden;
+
+        if (wasVisible && !this.tabVisible) {
+            // User left the tab
+            this.tabSwitchCount++;
+            if (!this._awayStart) this._awayStart = Date.now();
+            console.log(`[Tracker] Tab hidden (switch #${this.tabSwitchCount})`);
+        } else if (!wasVisible && this.tabVisible) {
+            // User came back
+            if (this._awayStart) {
+                this.totalAwayMs += Date.now() - this._awayStart;
+                this._awayStart = null;
+            }
+            console.log('[Tracker] Tab visible again');
+        }
+
+        this._checkActivity();
+    }
+
+    _onWindowBlur() {
+        this.windowFocused = false;
+        if (!this._awayStart) this._awayStart = Date.now();
+        this._checkActivity();
+    }
+
+    _onWindowFocus() {
+        this.windowFocused = true;
+        if (this._awayStart) {
+            this.totalAwayMs += Date.now() - this._awayStart;
+            this._awayStart = null;
+        }
+        this._checkActivity();
+    }
+
     _checkActivity() {
         const status = this.getStatus();
 
@@ -182,11 +297,17 @@ class ActivityTracker {
         const currentWinTitle = status.activeWindow ? status.activeWindow.title : '';
         const winChanged = this.lastWinTitle !== currentWinTitle;
 
+        // In browser mode, also detect tab focus changes
+        const tabChanged = (status.tabVisible !== undefined) &&
+            (this._lastTabVisible !== status.tabVisible || this._lastWindowFocused !== status.windowFocused);
+        this._lastTabVisible = status.tabVisible;
+        this._lastWindowFocused = status.windowFocused;
+
         this.isMouseActive = status.mouseActive !== false;
         this.isKeyboardActive = status.keyboardActive !== false;
         this.lastWinTitle = currentWinTitle;
 
-        if (wasMouseActive !== this.isMouseActive || wasKeyActive !== this.isKeyboardActive || winChanged) {
+        if (wasMouseActive !== this.isMouseActive || wasKeyActive !== this.isKeyboardActive || winChanged || tabChanged) {
             this._notify(status);
         }
     }

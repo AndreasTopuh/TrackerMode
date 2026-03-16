@@ -1,5 +1,5 @@
 /**
- * TrackerMode v2.4 — Session Manager
+ * TrackerMode v2.6 — Session Manager
  * Manages focus session timer, Pomodoro cycles, triggers alerts/quizzes,
  * and tracks app/window time usage for end-of-session evaluation.
  */

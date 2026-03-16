@@ -1,5 +1,5 @@
 """
-TrackerMode v2.5 — Attention Analyzer
+TrackerMode v2.6 — Attention Analyzer
 MediaPipe FaceLandmarker (Tasks API) + Haar Cascades fallback.
 """
 
@@ -62,10 +62,10 @@ class AttentionAnalyzer:
 
         # Always load Haar as fallback
         self.face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'  # type: ignore[attr-defined]
         )
         self.eye_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_eye.xml'
+            cv2.data.haarcascades + 'haarcascade_eye.xml'  # type: ignore[attr-defined]
         )
 
         # State tracking
@@ -73,7 +73,7 @@ class AttentionAnalyzer:
         self.face_detected_count = 0
         self.no_face_count = 0
         self.attention_history = []
-        self.history_max = 30
+        self.history_max = 60
         self.blink_total = 0
         self.prev_ear = 0.3
         self.session_start = time.time()
@@ -99,7 +99,9 @@ class AttentionAnalyzer:
         )
 
         try:
-            self.mp_frame_timestamp += 33
+            if self.face_landmarker is None:
+                return self._analyze_haar(frame)
+            self.mp_frame_timestamp = int(time.time() * 1000)
             result_data = self.face_landmarker.detect_for_video(mp_image, self.mp_frame_timestamp)
         except Exception as e:
             self.mp_errors += 1

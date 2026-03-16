@@ -1,5 +1,5 @@
 """
-TrackerMode v2.5 — AI Session Analyzer
+TrackerMode v2.6 — AI Session Analyzer
 Sends session data to OpenAI for productivity coaching analysis.
 """
 

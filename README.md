@@ -1,6 +1,6 @@
-# 🎯 TrackerMode v2.4 (Legacy)
+# 🎯 TrackerMode v2.6
 
-> **Notice: For the latest v2.5 Desktop Application, please navigate to the `TrackerModeDesktop` directory instead!**
+> **Notice: For the latest v2.6 Desktop Application, please navigate to the `TrackerModeDesktop` directory instead!**
 
 > **AI-powered focus tracking** with real-time eye tracking, active window title monitoring, and AI session analysis.
 
@@ -167,6 +167,17 @@ TrackerMode/
 ---
 
 ## 📝 Changelog
+
+### v2.6
+
+- 🛡️ **General/Strict Mode** — Two distraction modes at session start:
+  - **General Mode**: Block specific distraction apps (existing behavior)
+  - **Strict Mode**: Only allow listed apps — everything else triggers alerts
+- ✍️ **Writing/Watching Detection** — Every 5 minutes, asks if you're writing or watching/reading
+  - Writing mode relaxes gaze tracking (looking down at keyboard is expected)
+  - Watching mode keeps normal face/gaze metrics active
+- 🔒 **Mode-aware Motivation Modal** — Updated promise screen shows mode context
+- 📦 **Backend Mode Support** — API `/api/distractions` now accepts `mode` parameter
 
 ### v2.4
 

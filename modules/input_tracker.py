@@ -1,6 +1,7 @@
 """
-TrackerMode v2.5 — Global Input Tracker + Window Time Tracker
+TrackerMode v2.6 — Global Input Tracker + Window Time Tracker
 Tracks mouse/keyboard activity, active window, and time spent per app.
+v2.6: Added General/Strict mode support + allowed apps list.
 """
 
 import time
@@ -8,7 +9,71 @@ import threading
 
 
 # Default distraction keywords — matched against active window title
-DEFAULT_DISTRACTIONS = []
+DEFAULT_DISTRACTIONS = [
+    'youtube', 'netflix', 'tiktok', 'instagram', 'facebook',
+    'twitter', 'reddit', 'twitch', 'discord', 'whatsapp',
+    'telegram', 'spotify', 'steam', 'epic games',
+]
+
+# Auto-detection aliases: maps user-friendly names → actual window title keywords
+# When user types "microsoft word", we also match against "word", "winword", etc.
+APP_ALIASES = {
+    'microsoft word':       ['word', 'winword'],
+    'ms word':              ['word', 'winword'],
+    'microsoft excel':      ['excel'],
+    'ms excel':             ['excel'],
+    'microsoft powerpoint': ['powerpoint', 'pptx'],
+    'ms powerpoint':        ['powerpoint'],
+    'microsoft teams':      ['teams'],
+    'ms teams':             ['teams'],
+    'microsoft edge':       ['edge', 'msedge'],
+    'ms edge':              ['edge', 'msedge'],
+    'microsoft onenote':    ['onenote'],
+    'ms onenote':           ['onenote'],
+    'microsoft outlook':    ['outlook'],
+    'ms outlook':           ['outlook'],
+    'microsoft access':     ['access'],
+    'ms access':            ['access'],
+    'google chrome':        ['chrome'],
+    'mozilla firefox':      ['firefox'],
+    'visual studio code':   ['visual studio code', 'code'],
+    'vs code':              ['visual studio code', 'code'],
+    'vscode':               ['visual studio code', 'code'],
+    'visual studio':        ['visual studio'],
+    'adobe photoshop':      ['photoshop'],
+    'adobe illustrator':    ['illustrator'],
+    'adobe premiere':       ['premiere'],
+    'adobe after effects':  ['after effects'],
+    'sublime text':         ['sublime'],
+    'intellij idea':        ['intellij'],
+    'android studio':       ['android studio'],
+    'obs studio':           ['obs'],
+    'libre office':         ['libreoffice', 'libre'],
+    'file explorer':        ['explorer'],
+    'command prompt':       ['cmd.exe', 'command prompt'],
+    'windows terminal':     ['terminal', 'windowsterminal'],
+    'task manager':         ['task manager', 'taskmgr'],
+    'microsoft paint':      ['paint', 'mspaint'],
+    'google docs':          ['docs.google'],
+    'google sheets':        ['sheets.google'],
+    'google slides':        ['slides.google'],
+}
+
+
+def expand_keywords(keywords: list) -> list:
+    """Expand user keywords using APP_ALIASES for smarter matching.
+    e.g. ['microsoft word', 'chrome'] → ['microsoft word', 'word', 'winword', 'chrome']
+    """
+    expanded = set()
+    for kw in keywords:
+        kw_lower = kw.strip().lower()
+        if not kw_lower:
+            continue
+        expanded.add(kw_lower)
+        if kw_lower in APP_ALIASES:
+            for alias in APP_ALIASES[kw_lower]:
+                expanded.add(alias)
+    return list(expanded)
 
 
 class WindowTimeTracker:
@@ -88,13 +153,15 @@ class GlobalInputTracker:
             import pygetwindow as gw
             self._gw = gw
             self.gw_available = True
-            print("[v2.5] pygetwindow loaded — active window tracking available")
+            print("[v2.6] pygetwindow loaded — active window tracking available")
         except ImportError:
-            print("[v2.5] pygetwindow not installed — window tracking disabled")
+            print("[v2.6] pygetwindow not installed — window tracking disabled")
 
-        # Distraction list (can be extended by user)
+        # Distraction mode: 'general' (block listed) or 'strict' (only allow listed)
+        self.distraction_mode = 'general'
         self.distraction_keywords = list(DEFAULT_DISTRACTIONS)
         self.custom_distractions = []
+        self.allowed_apps = []  # For strict mode
 
         # Window time tracker
         self.window_time = WindowTimeTracker()
@@ -104,9 +171,9 @@ class GlobalInputTracker:
             self._mouse_module = mouse
             self._keyboard_module = keyboard
             self.available = True
-            print("[v2.5] pynput loaded — global input tracking available")
+            print("[v2.6] pynput loaded — global input tracking available")
         except ImportError:
-            print("[v2.5] pynput not installed — global tracking disabled")
+            print("[v2.6] pynput not installed — global tracking disabled")
 
     def start(self):
         if not self.available:
@@ -127,9 +194,9 @@ class GlobalInputTracker:
             with self._lock:
                 self.mouse_last_moved = time.time()
                 self.key_last_pressed = time.time()
-            print("[v2.5] Global input listeners started")
+            print("[v2.6] Global input listeners started")
         except Exception as e:
-            print(f"[v2.5] Failed to start input listeners: {e}")
+            print(f"[v2.6] Failed to start input listeners: {e}")
             self.available = False
 
     def stop(self):
@@ -152,11 +219,36 @@ class GlobalInputTracker:
             # Extract app name
             parts = title.replace(" — ", " - ").split(" - ")
             app_name = parts[-1].strip() if len(parts) > 1 else title.strip()
-            # Check distraction
             title_lower = title.lower()
-            all_distractions = self.distraction_keywords + self.custom_distractions
-            is_distraction = any(d in title_lower for d in all_distractions)
-            matched = next((d for d in all_distractions if d in title_lower), None)
+
+            # Check distraction based on mode
+            is_distraction = False
+            matched = None
+
+            if self.distraction_mode == 'strict':
+                # Strict mode: everything NOT in allowed list is a distraction
+                # Always allow TrackerMode itself and system processes
+                system_whitelist = [
+                    'trackermode', 'desktop', 'explorer', 'taskbar',
+                    'shell experience', 'snap assist', 'start menu',
+                    'task switching', 'program manager', 'action center',
+                    'notification', 'windows input', 'text input',
+                    'cortana', 'search', 'settings',
+                ]
+                is_system = any(s in title_lower for s in system_whitelist)
+                if is_system:
+                    is_distraction = False
+                elif len(self.allowed_apps) > 0:
+                    is_allowed = any(a in title_lower for a in self.allowed_apps)
+                    is_distraction = not is_allowed
+                    if is_distraction:
+                        matched = app_name.lower()
+                # else: no list = allow all
+            else:
+                # General mode: check against distraction list (current behavior)
+                all_distractions = self.distraction_keywords + self.custom_distractions
+                is_distraction = any(d in title_lower for d in all_distractions)
+                matched = next((d for d in all_distractions if d in title_lower), None)
 
             # Update window time tracker
             self.window_time.update(app_name)
@@ -170,11 +262,19 @@ class GlobalInputTracker:
         except Exception:
             return {"title": "Unknown", "app": "Unknown", "is_distraction": False}
 
+    def set_mode(self, mode: str):
+        """Set distraction mode: 'general' or 'strict'."""
+        self.distraction_mode = mode if mode in ('general', 'strict') else 'general'
+
+    def set_allowed_apps(self, apps: list):
+        """Set allowed apps for strict mode (auto-expands aliases)."""
+        self.allowed_apps = expand_keywords(apps)
+
     def add_custom_distractions(self, keywords: list):
-        """Add user-defined distraction keywords."""
-        for kw in keywords:
-            kw_lower = kw.strip().lower()
-            if kw_lower and kw_lower not in self.custom_distractions:
+        """Add user-defined distraction keywords (auto-expands aliases)."""
+        expanded = expand_keywords(keywords)
+        for kw_lower in expanded:
+            if kw_lower not in self.custom_distractions:
                 self.custom_distractions.append(kw_lower)
 
     def get_status(self):

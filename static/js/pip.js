@@ -1,19 +1,19 @@
 /**
- * TrackerMode v2.1 — Pop-out Metrics Window
+ * TrackerMode v2.6 — Pop-out Metrics Window
  * Opens /static/pip.html as a small popup.
- * Syncs data via localStorage (no about:blank, proper URL).
+ * Syncs data via BroadcastChannel (no polling, instant updates).
  */
 
 class PipMetrics {
     constructor() {
         this.popupWindow = null;
         this.isActive = false;
+        this.channel = null;
         this.data = {
             score: 0, gaze: '--', eyes: '--', head: '--',
             mouse: '--', keys: '--', blink: '0',
             alert: '', alertType: ''
         };
-        this.syncInterval = null;
     }
 
     async start() {
@@ -33,16 +33,14 @@ class PipMetrics {
                 return false;
             }
 
+            this.channel = new BroadcastChannel('tm_pip');
+
             this.popupWindow.addEventListener('beforeunload', () => {
                 this.isActive = false;
-                clearInterval(this.syncInterval);
             });
 
             this.isActive = true;
-
-            // Sync data to localStorage every 400ms
-            this.syncInterval = setInterval(() => this._sync(), 400);
-            this._sync();
+            this._send();
 
             return true;
         } catch (err) {
@@ -53,8 +51,11 @@ class PipMetrics {
 
     stop() {
         this.isActive = false;
-        clearInterval(this.syncInterval);
-        localStorage.removeItem('tm_pip_data');
+        if (this.channel) {
+            this.channel.postMessage({ type: 'close' });
+            this.channel.close();
+            this.channel = null;
+        }
         if (this.popupWindow && !this.popupWindow.closed) {
             this.popupWindow.close();
         }
@@ -63,26 +64,27 @@ class PipMetrics {
 
     update(data) {
         Object.assign(this.data, data);
+        this._send();
     }
 
     showAlert(title, message, type) {
         this.data.alert = message;
         this.data.alertType = type;
-        this._sync();
+        this._send();
         setTimeout(() => {
             this.data.alert = '';
             this.data.alertType = '';
+            this._send();
         }, 6000);
     }
 
-    _sync() {
-        if (!this.isActive) return;
+    _send() {
+        if (!this.isActive || !this.channel) return;
         if (this.popupWindow && this.popupWindow.closed) {
             this.isActive = false;
-            clearInterval(this.syncInterval);
             return;
         }
-        localStorage.setItem('tm_pip_data', JSON.stringify(this.data));
+        this.channel.postMessage({ type: 'update', data: this.data });
     }
 }
 

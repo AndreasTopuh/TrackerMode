@@ -1,1 +1,1 @@
-# TrackerMode v2.5 — Modular Backend
+# TrackerMode v2.6 — Modular Backend

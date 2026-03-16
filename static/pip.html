@@ -241,13 +241,21 @@
     <div class="alert" id="alert-bar"></div>
 
     <script>
-        // Listen for data from main window via localStorage
-        function update() {
-            try {
-                const raw = localStorage.getItem('tm_pip_data');
-                if (!raw) return;
-                const d = JSON.parse(raw);
+        // Listen for data from main window via BroadcastChannel (instant, no polling)
+        const channel = new BroadcastChannel('tm_pip');
 
+        channel.onmessage = (event) => {
+            if (event.data.type === 'close') {
+                window.close();
+                return;
+            }
+            if (event.data.type === 'update') {
+                applyData(event.data.data);
+            }
+        };
+
+        function applyData(d) {
+            try {
                 // Score
                 const scoreEl = document.getElementById('score');
                 scoreEl.textContent = d.score ?? '--';
@@ -304,10 +312,6 @@
             }
             return 50;
         }
-
-        // Update every 400ms
-        setInterval(update, 400);
-        update();
     </script>
 </body>
 
